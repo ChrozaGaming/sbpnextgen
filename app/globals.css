@@ -3,19 +3,105 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: rgb(243 244 246);
+  --foreground: #000000;
+  --primary: #4BB543;
+  --primary-foreground: #ffffff;
+  --secondary: #4B5563;
+  --secondary-foreground: #ffffff;
+  --accent: #f3f4f6;
+  --accent-foreground: #000000;
+  --destructive: #ff0000;
+  --destructive-foreground: #ffffff;
+  --muted: #9ca3af;
+  --muted-foreground: #6b7280;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #4BB543;
+  --radius: 0.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: rgb(243 244 246);
+    --foreground: #000000;
+    --primary: #4BB543;
+    --primary-foreground: #ffffff;
+    --secondary: #4B5563;
+    --secondary-foreground: #ffffff;
+    --accent: #1f2937;
+    --accent-foreground: #ffffff;
+    --destructive: #ff0000;
+    --destructive-foreground: #ffffff;
+    --muted: #6b7280;
+    --muted-foreground: #9ca3af;
+    --card: #1f2937;
+    --card-foreground: #ffffff;
+    --popover: #1f2937;
+    --popover-foreground: #ffffff;
+    --border: #374151;
+    --input: #374151;
+    --ring: #4BB543;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-gray-200; /* Ganti border-border dengan border-gray-200 */
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+}
+
+main {
+  transition: padding 0.3s ease;
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-in-out;
+}
+
+@screen sm {
+  main {
+    padding: 1rem;
+  }
+}
+
+@screen md {
+  main {
+    padding: 1.5rem;
+  }
+}
+
+@screen lg {
+  main {
+    padding: 2rem;
+  }
 }
