@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/pdfkit": "^0.13.6",
     "axios": "^1.7.8",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
@@ -17,8 +18,10 @@
     "lucide-react": "^0.462.0",
     "mysql2": "^3.11.4",
     "next": "15.0.3",
+    "pdfkit": "^0.15.1",
     "react": "19.0.0-rc-66855b96-20241106",
     "react-dom": "19.0.0-rc-66855b96-20241106",
+    "react-error-boundary": "^4.1.2",
     "react-icons": "^5.3.0"
   },
   "devDependencies": {

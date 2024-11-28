@@ -1,3 +1,4 @@
+//app/suratjalan/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -5,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import 'jspdf-autotable';
 import { generatePDF } from '@/utils/pdfGenerator';  // Hapus savePDF dari import
+import DataSuratJalan from "@/components/DataSuratJalan/DataSuratJalan";
+
 
 interface BarangItem {
     no?: string;
@@ -84,57 +87,88 @@ export default function SuratJalan() {
         try {
             setIsLoading(true);
 
-            // Validasi form
-            if (!formData.noSurat || !formData.tanggal || !formData.noPO ||
-                !formData.noKendaraan || !formData.ekspedisi) {
-                alert('Mohon lengkapi semua data surat jalan');
-                return;
-            }
+            // Validasi form yang lebih detail
+            const validateForm = () => {
+                if (!formData.noSurat.trim()) throw new Error('Nomor Surat harus diisi');
+                if (!formData.tanggal) throw new Error('Tanggal harus diisi');
+                if (!formData.noPO.trim()) throw new Error('Nomor PO harus diisi');
+                if (!formData.noKendaraan.trim()) throw new Error('Nomor Kendaraan harus diisi');
+                if (!formData.ekspedisi.trim()) throw new Error('Ekspedisi harus diisi');
+            };
+
+            // Validasi barang
+            const validateBarang = () => {
+                if (!barang.length) throw new Error('Minimal harus ada satu data barang');
+
+                barang.forEach((item, index) => {
+                    if (!item.jumlah.trim()) throw new Error(`Jumlah barang baris ${index + 1} harus diisi`);
+                    if (!item.kemasan.trim()) throw new Error(`Kemasan barang baris ${index + 1} harus diisi`);
+                    if (!item.kode.trim()) throw new Error(`Kode barang baris ${index + 1} harus diisi`);
+                    if (!item.nama.trim()) throw new Error(`Nama barang baris ${index + 1} harus diisi`);
+                });
+            };
+
+            // Jalankan validasi
+            validateForm();
+            validateBarang();
 
             if (!user?.id) {
-                alert('Sesi login tidak valid. Silakan login ulang.');
-                return;
-            }
-
-            if (!barang.length) {
-                alert('Minimal harus ada satu data barang');
-                return;
+                throw new Error('Sesi login tidak valid. Silakan login ulang.');
             }
 
             // Konfirmasi
             const isConfirmed = window.confirm('Apakah Anda yakin ingin menyimpan dan generate PDF?');
-            if (!isConfirmed) return;
+            if (!isConfirmed) {
+                setIsLoading(false);
+                return;
+            }
+
+            // Persiapkan data untuk dikirim
+            const suratJalanData = {
+                ...formData,
+                user_id: user.id,
+                tanggal: new Date(formData.tanggal).toISOString().split('T')[0]
+            };
 
             // Simpan data surat jalan
             const suratJalanResponse = await fetch('/api/suratjalan', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...formData,
-                    user_id: user.id
-                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                },
+                body: JSON.stringify(suratJalanData),
             });
 
-            const suratJalanData = await suratJalanResponse.json();
+            const suratJalanResult = await suratJalanResponse.json();
 
             if (!suratJalanResponse.ok) {
-                throw new Error(suratJalanData.error || 'Gagal menyimpan surat jalan');
+                throw new Error(suratJalanResult.error || 'Gagal menyimpan surat jalan');
             }
+
+            // Persiapkan data barang
+            const barangData = {
+                suratJalanId: suratJalanResult.data.id,
+                barang: barang.map((item, index) => ({
+                    ...item,
+                    no: (index + 1).toString()
+                }))
+            };
 
             // Simpan data barang
             const barangResponse = await fetch('/api/barang', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    suratJalanId: suratJalanData.id,
-                    barang: barang
-                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                },
+                body: JSON.stringify(barangData),
             });
 
-            const barangResponseData = await barangResponse.json();
+            const barangResult = await barangResponse.json();
 
             if (!barangResponse.ok) {
-                throw new Error(barangResponseData.error || 'Gagal menyimpan data barang');
+                throw new Error(barangResult.error || 'Gagal menyimpan data barang');
             }
 
             // Generate PDF
@@ -156,6 +190,7 @@ export default function SuratJalan() {
             setIsLoading(false);
         }
     };
+
 
 
     return (
@@ -304,10 +339,18 @@ export default function SuratJalan() {
             <button
                 onClick={handleGeneratePDF}
                 disabled={isLoading}
-                className="bg-green-500 text-white px-4 py-2 rounded disabled:bg-gray-400"
+                className="bg-green-500 text-white px-4 py-2 rounded disabled:bg-gray-400 mb-8"
             >
                 {isLoading ? 'Memproses...' : 'Simpan & Generate PDF'}
             </button>
+
+            {/* Tambahkan DataSuratJalan component di sini */}
+            <div className="mt-8">
+                <h2 className="text-2xl font-bold mb-4">Daftar Surat Jalan</h2>
+                <div className="bg-white p-4 rounded shadow">
+                    <DataSuratJalan />
+                </div>
+            </div>
         </div>
     );
 }

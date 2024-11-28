@@ -15,7 +15,6 @@ function isPublicRoute(path: string): boolean {
 }
 
 function checkAuth(request: NextRequest): boolean {
-    // Cek keberadaan token tanpa mengakses value secara langsung
     return request.cookies.has('token');
 }
 
@@ -25,8 +24,26 @@ function createRedirectUrl(request: NextRequest, pathname: string): URL {
     return url;
 }
 
+function addCorsHeaders(response: NextResponse): NextResponse {
+    // Add CORS headers
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return response;
+}
+
 export function middleware(request: NextRequest) {
     try {
+        // Handle OPTIONS request for CORS
+        if (request.method === 'OPTIONS') {
+            return addCorsHeaders(NextResponse.next());
+        }
+
+        // Check if it's an API route
+        if (request.nextUrl.pathname.startsWith('/api')) {
+            return addCorsHeaders(NextResponse.next());
+        }
+
         // Auth check
         const isAuthenticated = checkAuth(request);
 
@@ -44,17 +61,19 @@ export function middleware(request: NextRequest) {
         if (isProtectedRoute(currentPath) && !isAuthenticated) {
             const loginUrl = createRedirectUrl(request, '/login');
             loginUrl.searchParams.set('redirect', currentPath);
-            return NextResponse.redirect(loginUrl);
+            const response = NextResponse.redirect(loginUrl);
+            return addCorsHeaders(response);
         }
 
         // Public routes check untuk user yang sudah login
         if (isPublicRoute(currentPath) && isAuthenticated) {
             const dashboardUrl = createRedirectUrl(request, '/dashboard');
-            return NextResponse.redirect(dashboardUrl);
+            const response = NextResponse.redirect(dashboardUrl);
+            return addCorsHeaders(response);
         }
 
         // Lanjutkan request jika tidak ada redirect
-        return NextResponse.next();
+        return addCorsHeaders(NextResponse.next());
 
     } catch (error) {
         // Error logging
@@ -68,13 +87,16 @@ export function middleware(request: NextRequest) {
             errorUrl.searchParams.set('errorMessage', error.message);
         }
 
-        return NextResponse.redirect(errorUrl);
+        const response = NextResponse.redirect(errorUrl);
+        return addCorsHeaders(response);
     }
 }
 
 // Route matcher configuration
 export const config = {
     matcher: [
+        // API routes
+        '/api/:path*',
         // Protected routes
         '/dashboard/:path*',
         '/profile/:path*',

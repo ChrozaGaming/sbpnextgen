@@ -1,13 +1,15 @@
 // app/login/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Tambahkan useEffect
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation'; // Tambahkan ini
+import { useRouter, useSearchParams } from 'next/navigation'; // Tambahkan useSearchParams
 
 export default function Login() {
     const { login } = useAuth();
-    const router = useRouter(); // Tambahkan ini
+    const router = useRouter();
+    const searchParams = useSearchParams(); // Tambahkan ini
+
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -22,7 +24,6 @@ export default function Login() {
         });
     };
 
-// Di dalam handleSubmit pada login/page.tsx
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -40,28 +41,44 @@ export default function Login() {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || 'Login failed');
+                throw new Error(data.message || 'Login gagal');
             }
 
-            // Simpan token di localStorage dan cookie
-            localStorage.setItem('token', data.token);
-            document.cookie = `token=${data.token}; path=/; max-age=86400`; // 24 jam
+            if (data.success) {
+                // Hapus penyimpanan token manual karena sudah ditangani di AuthContext
+                await login(data.token, {
+                    userId: data.userId,
+                    username: data.username,
+                    email: data.email
+                });
 
-            await login(data.token, {
-                id: data.userId,
-                username: data.username,
-                email: data.email
-            });
-
-            router.push('/dashboard');
+                // Redirect akan ditangani oleh fungsi login
+                const redirectPath = searchParams.get('redirect');
+                if (redirectPath) {
+                    router.push(redirectPath);
+                } else {
+                    router.push('/dashboard');
+                }
+            } else {
+                throw new Error(data.message || 'Login gagal');
+            }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            setError(err instanceof Error ? err.message : 'Terjadi kesalahan');
             console.error('Login error:', err);
         } finally {
             setIsLoading(false);
         }
     };
 
+    // Error handling untuk middleware
+    useEffect(() => {
+        const error = searchParams.get('error');
+        const errorMessage = searchParams.get('errorMessage');
+
+        if (error === 'middleware_error') {
+            setError(errorMessage || 'Terjadi kesalahan pada autentikasi');
+        }
+    }, [searchParams]);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100">

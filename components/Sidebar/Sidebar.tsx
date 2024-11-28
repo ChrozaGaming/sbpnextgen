@@ -1,24 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import styles from './Sidebar.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { NO_SIDEBAR_ROUTES } from '@/config/route';
 
 interface SidebarProps {
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
-}
+};
 
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
-    const [mounted, setMounted] = useState(false);
     const pathname = usePathname();
-    const { user, isAuthenticated, logout } = useAuth(); // Menggunakan useAuth hook
+    const { user, isAuthenticated, logout } = useAuth();
 
-    if (!isAuthenticated) {
+    const handleLogout = () => {
+        try {
+            logout();
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+    };
+
+    const shouldHideSidebar = useCallback(() => {
+        return !isAuthenticated || (pathname && NO_SIDEBAR_ROUTES.includes(pathname as any));
+    }, [isAuthenticated, pathname]);
+
+    if (shouldHideSidebar()) {
         return null;
     }
 
@@ -41,65 +53,11 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                     </li>
                     <li>
                         <Link
-                            href="/user"
-                            className={`${styles.menuItem} ${pathname === '/user' ? styles.active : ''}`}
-                        >
-                            <i className="fas fa-user"></i>
-                            <span>User</span>
-                        </Link>
-                    </li>
-                    <li>
-                        <Link
                             href="/suratjalan"
                             className={`${styles.menuItem} ${pathname === '/suratjalan' ? styles.active : ''}`}
                         >
                             <i className="fas fa-envelope"></i>
-                            <span>Surat</span>
-                        </Link>
-                    </li>
-                    <li>
-                        <Link
-                            href="/analytics"
-                            className={`${styles.menuItem} ${pathname === '/analytics' ? styles.active : ''}`}
-                        >
-                            <i className="fas fa-chart-bar"></i>
-                            <span>Analytics</span>
-                        </Link>
-                    </li>
-                    <li>
-                        <Link
-                            href="/file-manager"
-                            className={`${styles.menuItem} ${pathname === '/file-manager' ? styles.active : ''}`}
-                        >
-                            <i className="fas fa-folder"></i>
-                            <span>File Manager</span>
-                        </Link>
-                    </li>
-                    <li>
-                        <Link
-                            href="/orders"
-                            className={`${styles.menuItem} ${pathname === '/orders' ? styles.active : ''}`}
-                        >
-                            <i className="fas fa-shopping-cart"></i>
-                            <span>Order</span>
-                        </Link>
-                    </li>
-                    <li>
-                        <Link
-                            href="/saved"
-                            className={`${styles.menuItem} ${pathname === '/saved' ? styles.active : ''}`}
-                        >
-                            <i className="fas fa-heart"></i>
-                            <span>Saved</span>
-                        </Link>
-                    </li>
-                    <li>
-                        <Link
-                            href="/settings"
-                            className={`${styles.menuItem} ${pathname === '/settings' ? styles.active : ''}`}
-                        >
-                            <i className="fas fa-cog"></i>
-                            <span>Setting</span>
+                            <span>Surat Jalan</span>
                         </Link>
                     </li>
                 </ul>
@@ -121,8 +79,9 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                         </div>
                     </div>
                     <button
-                        onClick={logout} // Menggunakan fungsi logout dari AuthContext
+                        onClick={handleLogout}
                         className={styles.logout}
+                        type="button"
                     >
                         <i className="fas fa-sign-out-alt"></i>
                         <span>Logout</span>
@@ -132,6 +91,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
             <button
                 className={styles.toggleButton}
                 onClick={() => setIsOpen(!isOpen)}
+                type="button"
             >
                 {isOpen ? <FaTimes /> : <FaBars />}
             </button>

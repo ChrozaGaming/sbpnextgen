@@ -6,8 +6,8 @@ import './globals.css';
 import Sidebar from '@/components/Sidebar/Sidebar';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { NO_SIDEBAR_ROUTES } from '@/config/route';
-import { AuthProvider } from '@/context/AuthContext';
+import { isAuthRoute } from '@/config/route'; // Hapus NO_SIDEBAR_ROUTES dari import
+import { AuthProvider } from '@/context/AuthContext'; // Ubah ini dari default import menjadi named import
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,7 +21,7 @@ export default function RootLayout({
     const [isMobile, setIsMobile] = useState(false);
     const pathname = usePathname();
 
-    const shouldShowSidebar = !NO_SIDEBAR_ROUTES.includes(pathname);
+    const shouldShowSidebar = pathname ? !isAuthRoute(pathname) : true;
 
     useEffect(() => {
         setMounted(true);

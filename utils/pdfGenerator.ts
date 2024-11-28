@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import 'jspdf-autotable'; // Import ini penting!
 import autoTable from 'jspdf-autotable';
 import { FormData, BarangItem } from '@/types/suratJalan';
 import { formatDate } from './dateFormatter';
@@ -9,6 +10,11 @@ interface jsPDFCustom extends jsPDF {
     previousAutoTable: {
         finalY: number;
     };
+}
+
+// Tambahkan tipe untuk jsPDF dengan autoTable
+interface jsPDFWithAutoTable extends jsPDF {
+    autoTable: (options: any) => void;
 }
 
 // Konstanta untuk warna
