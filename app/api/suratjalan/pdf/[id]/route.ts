@@ -37,106 +37,94 @@ export async function GET(
     request: Request,
     { params }: { params: { id: string } }
 ) {
-    // Pastikan params.id tersedia
-    const id = await Promise.resolve(params.id);
+    const conn = await db.getConnection();
 
     try {
-        // Ambil data surat jalan
-        const [suratJalan] = await db.query(
-            'SELECT sj.*, u.username FROM surat_jalan sj ' +
-            'JOIN users u ON sj.user_id = u.id ' +
-            'WHERE sj.id = ?',
-            [id]
-        );
-
-        // Ambil data barang
-        const [barangList] = await db.query(
-            'SELECT * FROM barang WHERE suratJalan_id = ?',
-            [id]
-        );
-
-        if (!Array.isArray(suratJalan) || suratJalan.length === 0) {
+        // Validasi ID
+        if (!params.id) {
             return NextResponse.json(
-                { error: 'Surat jalan tidak ditemukan' },
+                { success: false, error: 'ID tidak valid' },
+                { status: 400 }
+            );
+        }
+
+        // Ambil data surat jalan
+        const [suratJalanRows] = await conn.query<SuratJalan[]>(
+            `SELECT sj.*, u.username
+             FROM surat_jalan sj
+             LEFT JOIN users u ON sj.user_id = u.id
+             WHERE sj.id = ?`,
+            [params.id]
+        );
+
+        if (!suratJalanRows || suratJalanRows.length === 0) {
+            return NextResponse.json(
+                { success: false, error: 'Surat jalan tidak ditemukan' },
                 { status: 404 }
             );
         }
 
-        // Buat PDF
-        const doc = new PDFDocument();
-        const chunks: Buffer[] = [];
+        // Ambil data barang
+        const [barangRows] = await conn.query<Barang[]>(
+            'SELECT * FROM barang WHERE suratJalan_id = ?',
+            [params.id]
+        );
 
-        doc.on('data', chunk => chunks.push(chunk));
+        const suratJalan = suratJalanRows[0];
 
-        // Konten PDF
-        doc.fontSize(16).text('SURAT JALAN', { align: 'center' });
-        doc.moveDown();
+        // Konversi data ke format yang dibutuhkan oleh generatePDF
+        const formData: FormData = {
+            noSurat: suratJalan.noSurat,
+            tanggal: formatDate(suratJalan.tanggal),
+            noPO: suratJalan.noPO,
+            noKendaraan: suratJalan.noKendaraan,
+            ekspedisi: suratJalan.ekspedisi
+        };
 
-        // Info surat jalan
-        doc.fontSize(12);
-        doc.text(`No Surat: ${suratJalan[0].noSurat}`);
-        doc.text(`Tanggal: ${new Date(suratJalan[0].tanggal).toLocaleDateString('id-ID')}`);
-        doc.text(`No PO: ${suratJalan[0].noPO}`);
-        doc.text(`No Kendaraan: ${suratJalan[0].noKendaraan}`);
-        doc.text(`Ekspedisi: ${suratJalan[0].ekspedisi}`);
-        doc.moveDown();
+        const barangList: BarangItem[] = barangRows.map(item => ({
+            jumlah: item.jumlah,
+            kemasan: item.kemasan,
+            kode: item.kode,
+            nama: item.nama,
+            keterangan: item.keterangan || ''
+        }));
 
-        // Tabel barang
-        doc.text('Daftar Barang:', { underline: true });
-        doc.moveDown();
+        try {
+            // Generate PDF
+            const doc = generatePDF(formData, barangList, suratJalan.username);
+            const pdfBuffer = await doc.output('arraybuffer');
 
-        // Header tabel
-        const tableTop = doc.y;
-        const itemX = 50;
-        const columnSpacing = 80;
-
-        doc.text('No', itemX, tableTop);
-        doc.text('Kode', itemX + columnSpacing, tableTop);
-        doc.text('Nama', itemX + columnSpacing * 2, tableTop);
-        doc.text('Jumlah', itemX + columnSpacing * 3, tableTop);
-        doc.text('Kemasan', itemX + columnSpacing * 4, tableTop);
-
-        let y = tableTop + 20;
-
-        // Isi tabel
-        (barangList as any[]).forEach((item, index) => {
-            doc.text(String(index + 1), itemX, y);
-            doc.text(item.kode, itemX + columnSpacing, y);
-            doc.text(item.nama, itemX + columnSpacing * 2, y);
-            doc.text(item.jumlah, itemX + columnSpacing * 3, y);
-            doc.text(item.kemasan, itemX + columnSpacing * 4, y);
-            y += 20;
-        });
-
-        // Tanda tangan
-        doc.moveDown(4);
-        doc.text('Dibuat oleh:', { align: 'right' });
-        doc.moveDown(3);
-        doc.text(suratJalan[0].username, { align: 'right' });
-
-        // Finalisasi PDF
-        doc.end();
-
-        return new Promise<NextResponse>((resolve) => {
-            doc.on('end', () => {
-                const buffer = Buffer.concat(chunks);
-                resolve(new NextResponse(buffer, {
-                    headers: {
-                        'Content-Type': 'application/pdf',
-                        'Content-Disposition': `inline; filename="surat-jalan-${id}.pdf"`,
-                    },
-                }));
+            // Return PDF
+            return new Response(pdfBuffer, {
+                headers: {
+                    'Content-Type': 'application/pdf',
+                    'Content-Disposition': `inline; filename="SJ_${suratJalan.noSurat}.pdf"`,
+                },
             });
-        });
+        } catch (pdfError) {
+            console.error('PDF Generation Error:', pdfError);
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'Gagal generate PDF',
+                    details: pdfError instanceof Error ? pdfError.message : 'Unknown error'
+                },
+                { status: 500 }
+            );
+        }
 
     } catch (error) {
-        console.error('PDF Generation Error:', error);
+        console.error('Database Error:', error);
         return NextResponse.json(
             {
-                error: 'Gagal membuat PDF',
+                success: false,
+                error: 'Gagal mengambil data',
                 details: error instanceof Error ? error.message : 'Unknown error'
             },
             { status: 500 }
         );
+    } finally {
+        conn.release();
     }
 }
+
