@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FaFilePdf, FaTrash, FaChevronLeft, FaChevronRight, FaSearch, FaPrint } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { ErrorBoundary } from 'react-error-boundary';
 
+// Interfaces
 interface SuratJalan {
     id: number;
     noSurat: string;
@@ -26,13 +27,21 @@ interface PaginationInfo {
     hasPrevPage: boolean;
 }
 
-const LoadingSpinner = () => (
+interface ApiResponse {
+    success: boolean;
+    data: SuratJalan[];
+    pagination: PaginationInfo;
+    error?: string;
+}
+
+// Components
+const LoadingSpinner: React.FC = () => (
     <div className="flex justify-center items-center p-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
     </div>
 );
 
-const EmptyState = ({ searchTerm }: { searchTerm: string }) => (
+const EmptyState: React.FC<{ searchTerm: string }> = ({ searchTerm }) => (
     <div className="text-center py-4">
         {searchTerm
             ? `Tidak ada data surat jalan dengan nomor "${searchTerm}"`
@@ -40,20 +49,23 @@ const EmptyState = ({ searchTerm }: { searchTerm: string }) => (
     </div>
 );
 
-function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
-    return (
-        <div role="alert" className="text-center p-4">
-            <p className="text-red-500 font-bold">Terjadi kesalahan:</p>
-            <pre className="text-sm text-red-600 mt-2">{error.message}</pre>
-            <button
-                onClick={resetErrorBoundary}
-                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-                Coba Lagi
-            </button>
-        </div>
-    );
+interface ErrorFallbackProps {
+    error: Error;
+    resetErrorBoundary: () => void;
 }
+
+const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, resetErrorBoundary }) => (
+    <div role="alert" className="text-center p-4">
+        <p className="text-red-500 font-bold">Terjadi kesalahan:</p>
+        <pre className="text-sm text-red-600 mt-2">{error.message}</pre>
+        <button
+            onClick={resetErrorBoundary}
+            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+        >
+            Coba Lagi
+        </button>
+    </div>
+);
 
 const DataSuratJalan: React.FC = () => {
     const router = useRouter();
@@ -74,29 +86,13 @@ const DataSuratJalan: React.FC = () => {
         hasPrevPage: false
     });
 
-    // Debounce search term
-    const debouncedSearchTerm = useCallback(
-        (() => {
-            let timeoutId: NodeJS.Timeout;
-            return (value: string, callback: (value: string) => void) => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => callback(value), 500);
-            };
-        })(),
-        []
-    );
+    const lastFetchedData = useRef<string>('');
+    const pollingInterval = useRef<NodeJS.Timeout>();
 
-    useEffect(() => {
-        debouncedSearchTerm(searchTerm, (value) => {
-            setCurrentPage(1);
-            fetchData(value);
-        });
-    }, [searchTerm]);
-
-    const fetchData = useCallback(async (search: string = searchTerm) => {
+    const fetchData = useCallback(async (search: string = searchTerm, showLoading: boolean = true) => {
         try {
             setError(null);
-            setLoading(true);
+            if (showLoading) setLoading(true);
 
             const response = await fetch(
                 `/api/suratjalan?page=${currentPage}&limit=${itemsPerPage}&search=${search}`,
@@ -120,11 +116,15 @@ const DataSuratJalan: React.FC = () => {
                 throw new Error("Received non-JSON response from server");
             }
 
-            const result = await response.json();
+            const result = await response.json() as ApiResponse;
 
             if (result.success) {
-                setSuratJalan(result.data);
-                setPagination(result.pagination);
+                const newDataString = JSON.stringify(result.data);
+                if (newDataString !== lastFetchedData.current) {
+                    setSuratJalan(result.data);
+                    setPagination(result.pagination);
+                    lastFetchedData.current = newDataString;
+                }
             } else {
                 throw new Error(result.error || 'Failed to fetch data');
             }
@@ -132,9 +132,39 @@ const DataSuratJalan: React.FC = () => {
             console.error('Error fetching data:', error);
             setError(error instanceof Error ? error.message : 'Gagal memuat data');
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
-    }, [currentPage, itemsPerPage]);
+    }, [currentPage, itemsPerPage, searchTerm]);
+
+    // Setup polling
+    useEffect(() => {
+        fetchData(searchTerm, true);
+
+        // Start polling
+        pollingInterval.current = setInterval(() => {
+            fetchData(searchTerm, false);
+        }, 5000);
+
+        return () => {
+            if (pollingInterval.current) {
+                clearInterval(pollingInterval.current);
+            }
+        };
+    }, [fetchData, searchTerm]);
+
+    // Search debouncing
+    const debouncedSearch = useCallback((value: string) => {
+        setCurrentPage(1);
+        fetchData(value, true);
+    }, [fetchData]);
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            debouncedSearch(searchTerm);
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [searchTerm, debouncedSearch]);
 
     const handleDelete = async (id: number) => {
         if (!window.confirm('Apakah Anda yakin ingin menghapus surat jalan ini?')) {
@@ -150,7 +180,7 @@ const DataSuratJalan: React.FC = () => {
 
             if (data.success) {
                 alert('Surat jalan berhasil dihapus');
-                fetchData(); // Refresh data
+                fetchData(searchTerm, true);
             } else {
                 alert(data.error || 'Gagal menghapus surat jalan');
             }
@@ -159,8 +189,6 @@ const DataSuratJalan: React.FC = () => {
             alert('Terjadi kesalahan saat menghapus data');
         }
     };
-
-
 
     const handleViewPDF = (id: number) => {
         window.open(`/api/suratjalan/pdf/${id}`, '_blank');
@@ -173,12 +201,8 @@ const DataSuratJalan: React.FC = () => {
         });
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [currentPage]);
-
-    if (loading) return <LoadingSpinner />;
-    if (error) return <ErrorFallback error={new Error(error)} resetErrorBoundary={() => fetchData()} />;
+    if (loading && suratJalan.length === 0) return <LoadingSpinner />;
+    if (error) return <ErrorFallback error={new Error(error)} resetErrorBoundary={() => fetchData(searchTerm, true)} />;
 
     return (
         <div className="container mx-auto px-4">
@@ -205,7 +229,6 @@ const DataSuratJalan: React.FC = () => {
                 <>
                     <div className="overflow-x-auto shadow-md rounded-lg">
                         <table className="min-w-full bg-white">
-                            {/* Table Header */}
                             <thead className="bg-gray-50">
                             <tr>
                                 {['No.', 'No. Surat', 'Tanggal', 'No. PO', 'No. Kendaraan', 'Ekspedisi', 'Action'].map((header) => (
@@ -218,8 +241,6 @@ const DataSuratJalan: React.FC = () => {
                                 ))}
                             </tr>
                             </thead>
-
-                            {/* Table Body */}
                             <tbody className="bg-white divide-y divide-gray-200">
                             {suratJalan.map((item, index) => (
                                 <tr key={item.id} className="hover:bg-gray-50">
@@ -279,7 +300,6 @@ const DataSuratJalan: React.FC = () => {
                                 Menampilkan {pagination.startIndex} - {pagination.endIndex} dari {pagination.total} data
                             </p>
                         </div>
-
                         <div className="flex items-center space-x-2">
                             <button
                                 onClick={() => setCurrentPage(prev => prev - 1)}
@@ -292,11 +312,9 @@ const DataSuratJalan: React.FC = () => {
                             >
                                 <FaChevronLeft className="h-4 w-4" />
                             </button>
-
                             <span className="text-sm text-gray-700">
                                 Halaman {pagination.currentPage} dari {pagination.totalPages}
                             </span>
-
                             <button
                                 onClick={() => setCurrentPage(prev => prev + 1)}
                                 disabled={!pagination.hasNextPage}
