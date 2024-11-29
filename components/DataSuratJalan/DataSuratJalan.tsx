@@ -34,7 +34,6 @@ interface ApiResponse {
     error?: string;
 }
 
-// Components
 const LoadingSpinner: React.FC = () => (
     <div className="flex justify-center items-center p-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -73,6 +72,7 @@ const DataSuratJalan: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
     const [pagination, setPagination] = useState<PaginationInfo>({
@@ -88,8 +88,31 @@ const DataSuratJalan: React.FC = () => {
 
     const lastFetchedData = useRef<string>('');
     const pollingInterval = useRef<NodeJS.Timeout>();
+    const searchTimeout = useRef<NodeJS.Timeout>();
 
-    const fetchData = useCallback(async (search: string = searchTerm, showLoading: boolean = true) => {
+    // Calculate row number based on current page and position
+    const getRowNumber = (index: number): number => {
+        return ((currentPage - 1) * itemsPerPage) + index + 1;
+    };
+
+    useEffect(() => {
+        if (searchTimeout.current) {
+            clearTimeout(searchTimeout.current);
+        }
+
+        searchTimeout.current = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+            setCurrentPage(1);
+        }, 300);
+
+        return () => {
+            if (searchTimeout.current) {
+                clearTimeout(searchTimeout.current);
+            }
+        };
+    }, [searchTerm]);
+
+    const fetchData = useCallback(async (search: string = debouncedSearchTerm, showLoading: boolean = true) => {
         try {
             setError(null);
             if (showLoading) setLoading(true);
@@ -111,18 +134,16 @@ const DataSuratJalan: React.FC = () => {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const contentType = response.headers.get("content-type");
-            if (!contentType || !contentType.includes("application/json")) {
-                throw new Error("Received non-JSON response from server");
-            }
-
             const result = await response.json() as ApiResponse;
 
             if (result.success) {
                 const newDataString = JSON.stringify(result.data);
                 if (newDataString !== lastFetchedData.current) {
                     setSuratJalan(result.data);
-                    setPagination(result.pagination);
+                    setPagination({
+                        ...result.pagination,
+                        startIndex: (result.pagination.currentPage - 1) * itemsPerPage
+                    });
                     lastFetchedData.current = newDataString;
                 }
             } else {
@@ -134,15 +155,15 @@ const DataSuratJalan: React.FC = () => {
         } finally {
             if (showLoading) setLoading(false);
         }
-    }, [currentPage, itemsPerPage, searchTerm]);
+    }, [currentPage, itemsPerPage, debouncedSearchTerm]);
 
-    // Setup polling
     useEffect(() => {
-        fetchData(searchTerm, true);
+        fetchData(debouncedSearchTerm, true);
+    }, [fetchData, debouncedSearchTerm, currentPage]);
 
-        // Start polling
+    useEffect(() => {
         pollingInterval.current = setInterval(() => {
-            fetchData(searchTerm, false);
+            fetchData(debouncedSearchTerm, false);
         }, 5000);
 
         return () => {
@@ -150,21 +171,7 @@ const DataSuratJalan: React.FC = () => {
                 clearInterval(pollingInterval.current);
             }
         };
-    }, [fetchData, searchTerm]);
-
-    // Search debouncing
-    const debouncedSearch = useCallback((value: string) => {
-        setCurrentPage(1);
-        fetchData(value, true);
-    }, [fetchData]);
-
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            debouncedSearch(searchTerm);
-        }, 500);
-
-        return () => clearTimeout(timeoutId);
-    }, [searchTerm, debouncedSearch]);
+    }, [fetchData, debouncedSearchTerm]);
 
     const handleDelete = async (id: number) => {
         if (!window.confirm('Apakah Anda yakin ingin menghapus surat jalan ini?')) {
@@ -180,7 +187,11 @@ const DataSuratJalan: React.FC = () => {
 
             if (data.success) {
                 alert('Surat jalan berhasil dihapus');
-                fetchData(searchTerm, true);
+                // Reset to page 1 if current page becomes empty after deletion
+                if (suratJalan.length === 1 && currentPage > 1) {
+                    setCurrentPage(1);
+                }
+                fetchData(debouncedSearchTerm, true);
             } else {
                 alert(data.error || 'Gagal menghapus surat jalan');
             }
@@ -202,11 +213,10 @@ const DataSuratJalan: React.FC = () => {
     };
 
     if (loading && suratJalan.length === 0) return <LoadingSpinner />;
-    if (error) return <ErrorFallback error={new Error(error)} resetErrorBoundary={() => fetchData(searchTerm, true)} />;
+    if (error) return <ErrorFallback error={new Error(error)} resetErrorBoundary={() => fetchData(debouncedSearchTerm, true)} />;
 
     return (
         <div className="container mx-auto px-4">
-            {/* Search Input */}
             <div className="mb-4">
                 <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -218,11 +228,11 @@ const DataSuratJalan: React.FC = () => {
                         placeholder="Cari No Surat..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        autoFocus
                     />
                 </div>
             </div>
 
-            {/* Table */}
             {suratJalan.length === 0 ? (
                 <EmptyState searchTerm={searchTerm} />
             ) : (
@@ -245,7 +255,7 @@ const DataSuratJalan: React.FC = () => {
                             {suratJalan.map((item, index) => (
                                 <tr key={item.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {pagination.startIndex + index}
+                                        {getRowNumber(index)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {item.noSurat}
@@ -293,11 +303,10 @@ const DataSuratJalan: React.FC = () => {
                         </table>
                     </div>
 
-                    {/* Pagination */}
                     <div className="mt-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-700">
-                                Menampilkan {pagination.startIndex} - {pagination.endIndex} dari {pagination.total} data
+                                Menampilkan {getRowNumber(0)} - {getRowNumber(suratJalan.length - 1)} dari {pagination.total} data
                             </p>
                         </div>
                         <div className="flex items-center space-x-2">
