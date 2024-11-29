@@ -1,22 +1,22 @@
 'use client';
 
-import {useCallback} from 'react';
+import { useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import {FaBars, FaTimes} from 'react-icons/fa';
+import { FaBars, FaTimes } from 'react-icons/fa';
 import styles from './Sidebar.module.css';
-import {usePathname} from 'next/navigation';
-import {useAuth} from '@/context/AuthContext';
-import {NO_SIDEBAR_ROUTES} from '@/config/route';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { NO_SIDEBAR_ROUTES } from '@/config/route';
 
 interface SidebarProps {
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
 };
 
-const Sidebar = ({isOpen, setIsOpen}: SidebarProps) => {
+const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     const pathname = usePathname();
-    const {user, isAuthenticated, logout} = useAuth();
+    const { user, isAuthenticated, logout } = useAuth();
 
     const handleLogout = () => {
         try {
@@ -78,8 +78,15 @@ const Sidebar = ({isOpen, setIsOpen}: SidebarProps) => {
                             <span className="text-sm text-gray-300">{user?.email}</span>
                         </div>
                     </div>
+                    <button
+                        onClick={handleLogout}
+                        className={styles.logout}
+                        type="button"
+                    >
+                        <i className="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
                 </div>
-
             </div>
             <button
                 className={styles.toggleButton}
