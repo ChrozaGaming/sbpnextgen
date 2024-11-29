@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import 'jspdf-autotable';
-import { generatePDF } from '@/utils/pdfGenerator';  // Hapus savePDF dari import
+import { generateMultiCopyPDF } from '@/utils/pdfGenerator';  // Fixed this line
 import DataSuratJalan from "@/components/DataSuratJalan/DataSuratJalan";
 
 
@@ -172,16 +172,15 @@ export default function SuratJalan() {
             }
 
             // Generate PDF
-            const doc = generatePDF(formData, barang, user?.username || 'Unknown');
+            const doc = generateMultiCopyPDF(formData, barang, user?.username || 'Unknown');
 
             // Simpan PDF dengan nama file yang sesuai
-            const fileName = `SJ_${formData.noSurat}_${formData.tanggal}.pdf`;
+            const fileName = `SJ_${formData.noSurat}_${formData.tanggal}_MULTI.pdf`;
             doc.save(fileName);
 
-            // Reset form dan tampilkan sukses
             setFormData(defaultFormData);
             setBarang([defaultBarangItem]);
-            alert('Data berhasil disimpan dan PDF telah digenerate');
+            alert('Data berhasil disimpan dan PDF dengan 3 copy telah digenerate');
 
         } catch (error) {
             console.error('Error:', error);

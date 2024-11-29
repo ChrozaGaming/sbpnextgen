@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
-import { generatePDF } from '@/utils/pdfGenerator';
+import { generateMultiCopyPDF } from '@/utils/pdfGenerator';
 import { FormData, BarangItem } from '@/types/suratJalan';
 import { NextResponse } from 'next/server';
 
@@ -72,7 +72,7 @@ export async function GET(
 
         const suratJalan = suratJalanRows[0];
 
-        // Konversi data ke format yang dibutuhkan oleh generatePDF
+        // Konversi data ke format yang dibutuhkan oleh generateMultiCopyPDF
         const formData: FormData = {
             noSurat: suratJalan.noSurat,
             tanggal: formatDate(suratJalan.tanggal),
@@ -81,7 +81,8 @@ export async function GET(
             ekspedisi: suratJalan.ekspedisi
         };
 
-        const barangList: BarangItem[] = barangRows.map(item => ({
+        const barangList: BarangItem[] = barangRows.map((item, index) => ({
+            no: (index + 1).toString(),
             jumlah: item.jumlah,
             kemasan: item.kemasan,
             kode: item.kode,
@@ -90,17 +91,19 @@ export async function GET(
         }));
 
         try {
-            // Generate PDF
-            const doc = generatePDF(formData, barangList, suratJalan.username);
+            // Generate PDF dengan 3 copy (Kantor, Driver, Customer)
+            const doc = generateMultiCopyPDF(formData, barangList, suratJalan.username);
             const pdfBuffer = await doc.output('arraybuffer');
 
-            // Return PDF
+            // Return PDF dengan filename yang sesuai
             return new Response(pdfBuffer, {
                 headers: {
                     'Content-Type': 'application/pdf',
-                    'Content-Disposition': `inline; filename="SJ_${suratJalan.noSurat}.pdf"`,
+                    'Content-Disposition': `inline; filename="SJ_${suratJalan.noSurat}_${formatDate(suratJalan.tanggal)}_MULTI.pdf"`,
+                    'Cache-Control': 'no-cache'
                 },
             });
+
         } catch (pdfError) {
             console.error('PDF Generation Error:', pdfError);
             return NextResponse.json(
@@ -127,4 +130,3 @@ export async function GET(
         conn.release();
     }
 }
-

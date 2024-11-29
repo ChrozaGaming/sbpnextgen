@@ -1,10 +1,9 @@
 import jsPDF from "jspdf";
-import 'jspdf-autotable'; // Import ini penting!
+import 'jspdf-autotable';
 import autoTable from 'jspdf-autotable';
 import { FormData, BarangItem } from '@/types/suratJalan';
 import { formatDate } from './dateFormatter';
 
-// Extend jsPDF dengan tipe yang lebih spesifik
 interface jsPDFCustom extends jsPDF {
     autoTable: typeof autoTable;
     previousAutoTable: {
@@ -12,20 +11,18 @@ interface jsPDFCustom extends jsPDF {
     };
 }
 
-// Tambahkan tipe untuk jsPDF dengan autoTable
-interface jsPDFWithAutoTable extends jsPDF {
-    autoTable: (options: any) => void;
-}
-
-// Konstanta untuk warna
-const RGB_COLOR = {
-    primary: { r: 75, g: 181, b: 154 },
-    white: { r: 255, g: 255, b: 255 },
-    black: { r: 0, g: 0, b: 0 }
+// Define colors for different copies
+const COPY_COLORS = {
+    KANTOR: { r: 75, g: 181, b: 154 },  // Green
+    DRIVER: { r: 255, g: 182, b: 193 },  // Pink
+    CUSTOMER: { r: 100, g: 149, b: 237 }, // Blue
+    WHITE: { r: 255, g: 255, b: 255 },   // White
+    BLACK: { r: 0, g: 0, b: 0 }          // Black
 };
 
-// Fungsi untuk membuat header
-export const createHeader = (doc: jsPDFCustom): void => {
+// Fungsi untuk membuat header dengan warna yang berbeda
+const createHeader = (doc: jsPDFCustom, color: { r: number, g: number, b: number }, copyText: string): void => {
+    // Logo placeholder
     doc.rect(15, 15, 25, 25);
 
     doc.setFont("helvetica", "bold");
@@ -33,6 +30,13 @@ export const createHeader = (doc: jsPDFCustom): void => {
     doc.text("PT. SINAR BUANA PRIMA", 45, 25);
     doc.text("SURAT JALAN / DELIVERY ORDER", 105, 16, { align: 'center' });
 
+    // Add copy text with color
+    doc.setFontSize(8);
+    doc.setTextColor(color.r, color.g, color.b);
+    doc.text(`[${copyText}]`, 180, 16);
+    doc.setTextColor(COPY_COLORS.BLACK.r, COPY_COLORS.BLACK.g, COPY_COLORS.BLACK.b);
+
+    // Company details
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text("General Contractor, Supplier & Trading", 45, 32);
@@ -40,28 +44,32 @@ export const createHeader = (doc: jsPDFCustom): void => {
     doc.text("Telp: 031-8967577 | Fax: 031-8970521", 45, 42);
     doc.text("Email: sinarbuanaprima@yahoo.co.id", 45, 47);
 
-    doc.setDrawColor(RGB_COLOR.primary.r, RGB_COLOR.primary.g, RGB_COLOR.primary.b);
+    // Colored line
+    doc.setDrawColor(color.r, color.g, color.b);
     doc.setLineWidth(0.5);
     doc.line(15, 55, 195, 55);
 };
 
 // Fungsi untuk membuat detail dokumen
-export const createDocumentDetails = (doc: jsPDFCustom, formData: FormData): void => {
-    doc.setDrawColor(RGB_COLOR.primary.r, RGB_COLOR.primary.g, RGB_COLOR.primary.b);
-    doc.setFillColor(240, 248, 255);
+const createDocumentDetails = (doc: jsPDFCustom, formData: FormData, color: { r: number, g: number, b: number }): void => {
+    // Create colored background
+    doc.setDrawColor(color.r, color.g, color.b);
+    const lightColor = `rgb(${Math.min(color.r + 180, 255)}, ${Math.min(color.g + 180, 255)}, ${Math.min(color.b + 180, 255)})`;
+    doc.setFillColor(lightColor);
     doc.rect(15, 60, 180, 35, 'F');
 
     const detailStartY = 68;
     const detailLineHeight = 7;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-
+    // Left side details
     const leftLabels = [
         { label: "No. Surat", value: formData.noSurat },
         { label: "Tanggal", value: formData.tanggal },
         { label: "No. PO", value: formData.noPO }
     ];
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
 
     leftLabels.forEach((item, index) => {
         const y = detailStartY + (index * detailLineHeight);
@@ -72,6 +80,7 @@ export const createDocumentDetails = (doc: jsPDFCustom, formData: FormData): voi
         doc.setFont("helvetica", "bold");
     });
 
+    // Right side details
     const rightLabels = [
         { label: "No. Kendaraan", value: formData.noKendaraan },
         { label: "Ekspedisi", value: formData.ekspedisi }
@@ -88,33 +97,33 @@ export const createDocumentDetails = (doc: jsPDFCustom, formData: FormData): voi
 };
 
 // Fungsi untuk membuat tanda tangan
-export const createSignatures = (doc: jsPDFCustom, yPosition: number): void => {
+const createSignatures = (doc: jsPDFCustom, startY: number): void => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
 
     const signatures = [
         {
+            title: "Barang Diterima Oleh:",
             x: 20,
-            texts: [
-                "Barang Diterima Oleh:",
+            lines: [
                 "Tgl: _________________",
                 "Nama Jelas / Stempel:",
                 "_____________________"
             ]
         },
         {
+            title: "Ditandatangani oleh:",
             x: 85,
-            texts: [
-                "Ditandatangani oleh:",
+            lines: [
                 "Sopir: _________________",
                 "Satpam: ________________",
                 "_____________________"
             ]
         },
         {
+            title: "Hormat Kami,",
             x: 150,
-            texts: [
-                "Hormat Kami,",
+            lines: [
                 "",
                 "",
                 "_____________________",
@@ -123,48 +132,44 @@ export const createSignatures = (doc: jsPDFCustom, yPosition: number): void => {
         }
     ];
 
-    signatures.forEach(({ x, texts }) => {
-        texts.forEach((text, index) => {
-            doc.text(text, x, yPosition + (index * 15));
+    signatures.forEach(sig => {
+        doc.text(sig.title, sig.x, startY);
+        sig.lines.forEach((line, index) => {
+            doc.text(line, sig.x, startY + ((index + 1) * 7));
         });
     });
 };
 
-// Fungsi untuk membuat footer dengan pagination
-export const createFooterWithPagination = (
+// Fungsi untuk membuat footer dengan info halaman
+const createFooter = (
     doc: jsPDFCustom,
     username: string,
-    currentPage: number,
-    totalPages: number
+    copyText: string,
+    color: { r: number, g: number, b: number }
 ): void => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    doc.setDrawColor(RGB_COLOR.primary.r, RGB_COLOR.primary.g, RGB_COLOR.primary.b);
+    // Colored border
+    doc.setDrawColor(color.r, color.g, color.b);
     doc.setLineWidth(0.5);
     doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
 
-    doc.setTextColor(128);
+    // Footer text
     doc.setFontSize(8);
-
-    [
+    doc.setTextColor(128);
+    doc.text([
         `Dicetak pada: ${formatDate()}`,
-        `Dicetak oleh Admin: ${username || 'Unknown'}`,
-        `Halaman ${currentPage} dari ${totalPages}`
-    ].forEach((text, index) => {
-        doc.text(
-            text,
-            pageWidth - 15,
-            pageHeight - (25 - (index * 5)),
-            { align: 'right' }
-        );
+        `Dicetak oleh: ${username}`,
+        `Copy: ${copyText}`
+    ], pageWidth - 15, pageHeight - 25, {
+        align: 'right',
+        lineHeightFactor: 1.5
     });
-
-    doc.setTextColor(RGB_COLOR.black.r);
 };
 
-// Fungsi utama untuk generate PDF
-export const generatePDF = (
+// Main function to generate multi-copy PDF
+export const generateMultiCopyPDF = (
     formData: FormData,
     barang: BarangItem[],
     username: string
@@ -175,26 +180,27 @@ export const generatePDF = (
         format: "a4"
     }) as jsPDFCustom;
 
-    const ITEMS_PER_PAGE = 10;
-    const totalPages = Math.ceil(barang.length / ITEMS_PER_PAGE);
 
-    for (let currentPage = 0; currentPage < totalPages; currentPage++) {
-        if (currentPage > 0) {
+    const copies = [
+        { color: COPY_COLORS.KANTOR, text: "KANTOR" },
+        { color: COPY_COLORS.DRIVER, text: "DRIVER" },
+        { color: COPY_COLORS.CUSTOMER, text: "CUSTOMER" }
+    ];
+
+    copies.forEach((copy, copyIndex) => {
+        if (copyIndex > 0) {
             doc.addPage();
         }
 
-        createHeader(doc);
-        createDocumentDetails(doc, formData);
+        createHeader(doc, copy.color, copy.text);
+        createDocumentDetails(doc, formData, copy.color);
 
-        const startIdx = currentPage * ITEMS_PER_PAGE;
-        const endIdx = Math.min(startIdx + ITEMS_PER_PAGE, barang.length);
-        const currentPageItems = barang.slice(startIdx, endIdx);
-
+        // Create table
         doc.autoTable({
             startY: 100,
             head: [["No", "Jumlah", "Kemasan", "Kode", "Nama Barang", "Keterangan"]],
-            body: currentPageItems.map((item, index) => [
-                startIdx + index + 1,
+            body: barang.map((item, index) => [
+                index + 1,
                 item.jumlah,
                 item.kemasan,
                 item.kode,
@@ -203,8 +209,8 @@ export const generatePDF = (
             ]),
             theme: 'grid',
             headStyles: {
-                fillColor: [RGB_COLOR.primary.r, RGB_COLOR.primary.g, RGB_COLOR.primary.b],
-                textColor: RGB_COLOR.white.r,
+                fillColor: [copy.color.r, copy.color.g, copy.color.b],
+                textColor: [COPY_COLORS.WHITE.r, COPY_COLORS.WHITE.g, COPY_COLORS.WHITE.b],
                 fontStyle: 'bold',
                 halign: 'center',
                 valign: 'middle',
@@ -223,19 +229,15 @@ export const generatePDF = (
         });
 
         const finalY = doc.previousAutoTable.finalY + 10;
-
-        if (currentPage === totalPages - 1) {
-            createSignatures(doc, finalY);
-        }
-
-        createFooterWithPagination(doc, username, currentPage + 1, totalPages);
-    }
+        createSignatures(doc, finalY);
+        createFooter(doc, username, copy.text, copy.color);
+    });
 
     return doc;
 };
 
-// Fungsi untuk menyimpan PDF
-export const savePDF = (doc: jsPDFCustom, formData: FormData): void => {
-    const fileName = `SJ_${formData.noSurat}_${formData.tanggal}.pdf`;
-    doc.save(fileName);
-};
+// Utility function to save PDF
+// export const savePDF = (doc: jsPDFCustom, formData: FormData): void => {
+//     const fileName = `SJ_${formData.noSurat}_${formData.tanggal}_MULTI.pdf`;
+//     doc.save(fileName);
+// };

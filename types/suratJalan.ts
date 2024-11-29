@@ -7,7 +7,7 @@ export interface FormData {
 }
 
 export interface BarangItem {
-    no?: string;  // tambahkan tanda ? untuk membuat opsional
+    no?: string;
     jumlah: string;
     kemasan: string;
     kode: string;
