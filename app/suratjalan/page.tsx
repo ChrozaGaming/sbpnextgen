@@ -1,13 +1,11 @@
-//app/suratjalan/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import 'jspdf-autotable';
-import { generateMultiCopyPDF } from '@/utils/pdfGenerator';  // Fixed this line
+import { generateMultiCopyPDF } from '@/utils/pdfGenerator';
 import DataSuratJalan from "@/components/DataSuratJalan/DataSuratJalan";
-
 
 interface BarangItem {
     no?: string;
@@ -24,6 +22,7 @@ interface FormData {
     noPO: string;
     noKendaraan: string;
     ekspedisi: string;
+    tujuan: string;  // Added tujuan field
 }
 
 const defaultBarangItem: BarangItem = {
@@ -39,7 +38,8 @@ const defaultFormData: FormData = {
     tanggal: '',
     noPO: '',
     noKendaraan: '',
-    ekspedisi: ''
+    ekspedisi: '',
+    tujuan: ''  // Added tujuan default value
 };
 
 export default function SuratJalan() {
@@ -94,6 +94,7 @@ export default function SuratJalan() {
                 if (!formData.noPO.trim()) throw new Error('Nomor PO harus diisi');
                 if (!formData.noKendaraan.trim()) throw new Error('Nomor Kendaraan harus diisi');
                 if (!formData.ekspedisi.trim()) throw new Error('Ekspedisi harus diisi');
+                if (!formData.tujuan.trim()) throw new Error('Tujuan harus diisi');  // Added tujuan validation
             };
 
             // Validasi barang
@@ -180,7 +181,7 @@ export default function SuratJalan() {
 
             setFormData(defaultFormData);
             setBarang([defaultBarangItem]);
-            alert('Data berhasil disimpan dan PDF dengan 3 copy telah digenerate');
+            alert('Data berhasil disimpan dan PDF dengan 4 copy telah digenerate');
 
         } catch (error) {
             console.error('Error:', error);
@@ -189,8 +190,6 @@ export default function SuratJalan() {
             setIsLoading(false);
         }
     };
-
-
 
     return (
         <div className="container mx-auto p-4">
@@ -245,6 +244,16 @@ export default function SuratJalan() {
                             type="text"
                             name="ekspedisi"
                             value={formData.ekspedisi}
+                            onChange={handleFormChange}
+                            className="w-full border p-2 rounded"
+                        />
+                    </div>
+                    <div>
+                        <label className="block mb-2">Tujuan:</label>
+                        <input
+                            type="text"
+                            name="tujuan"
+                            value={formData.tujuan}
                             onChange={handleFormChange}
                             className="w-full border p-2 rounded"
                         />
