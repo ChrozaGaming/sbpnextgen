@@ -3,6 +3,7 @@ import 'jspdf-autotable';
 import autoTable from 'jspdf-autotable';
 import { FormData, BarangItem } from '@/types/suratJalan';
 import { formatDate } from './dateFormatter';
+const logoPath = '/images/logo.png';
 
 interface jsPDFCustom extends jsPDF {
     autoTable: typeof autoTable;
@@ -11,33 +12,47 @@ interface jsPDFCustom extends jsPDF {
     };
 }
 
-// Define colors for different copies
+function formatTanggal(dateString: string): string {
+    const days = [
+        'Minggu', 'Senin', 'Selasa', 'Rabu',
+        'Kamis', 'Jumat', 'Sabtu'
+    ];
+
+    const months = [
+        'Januari', 'Februari', 'Maret', 'April',
+        'Mei', 'Juni', 'Juli', 'Agustus',
+        'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    const date = new Date(dateString);
+    const dayName = days[date.getDay()];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+
+    return `${dayName}, ${day} ${month} ${year}`;
+}
+
 const COPY_COLORS = {
-    KANTOR: { r: 75, g: 181, b: 154 },    // Green
-    DRIVER: { r: 255, g: 182, b: 193 },    // Pink
-    CUSTOMER: { r: 100, g: 149, b: 237 },  // Blue
-    GUDANG: { r: 255, g: 140, b: 0 },      // Orange
-    WHITE: { r: 255, g: 255, b: 255 },     // White
-    BLACK: { r: 0, g: 0, b: 0 }            // Black
+    BLACK: { r: 0, g: 0, b: 0 },          // Hitam untuk ACC
+    PINK: { r: 255, g: 192, b: 203 },     // Pink untuk Admin Gudang
+    GREEN: { r: 144, g: 238, b: 144 },    // Hijau untuk Penerima
+    ORANGE: { r: 255, g: 165, b: 0 },     // Orange untuk Arsip
+    WHITE: { r: 255, g: 255, b: 255 }
 };
 
-// Function to create header
 const createHeader = (doc: jsPDFCustom, color: { r: number, g: number, b: number }, copyText: string): void => {
-    // Logo placeholder
-    doc.rect(15, 15, 25, 25);
-
+    doc.addImage(logoPath, 'PNG', 15, 15, 25, 25);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.text("PT. SINAR BUANA PRIMA", 45, 25);
     doc.text("SURAT JALAN / DELIVERY ORDER", 105, 16, { align: 'center' });
 
-    // Add copy text with color
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setTextColor(color.r, color.g, color.b);
     doc.text(`[${copyText}]`, 180, 16);
     doc.setTextColor(COPY_COLORS.BLACK.r, COPY_COLORS.BLACK.g, COPY_COLORS.BLACK.b);
 
-    // Company details
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text("General Contractor, Supplier & Trading", 45, 32);
@@ -45,27 +60,33 @@ const createHeader = (doc: jsPDFCustom, color: { r: number, g: number, b: number
     doc.text("Telp: 031-8967577 | Fax: 031-8970521", 45, 42);
     doc.text("Email: sinarbuanaprima@yahoo.co.id", 45, 47);
 
-    // Colored line
     doc.setDrawColor(color.r, color.g, color.b);
     doc.setLineWidth(0.5);
     doc.line(15, 55, 195, 55);
 };
 
-// Function to create document details
 const createDocumentDetails = (doc: jsPDFCustom, formData: FormData, color: { r: number, g: number, b: number }): void => {
-    // Create colored background
     doc.setDrawColor(color.r, color.g, color.b);
-    const lightColor = `rgb(${Math.min(color.r + 180, 255)}, ${Math.min(color.g + 180, 255)}, ${Math.min(color.b + 180, 255)})`;
-    doc.setFillColor(lightColor);
+
+    // Set warna fill berdasarkan jenis copy
+    if (color === COPY_COLORS.BLACK) {
+        doc.setFillColor(200, 200, 200); // Abu-abu muda untuk ACC
+    } else if (color === COPY_COLORS.PINK) {
+        doc.setFillColor(255, 235, 238); // Pink muda untuk ADM.GUDANG
+    } else if (color === COPY_COLORS.GREEN) {
+        doc.setFillColor(235, 255, 238); // Hijau muda untuk PENERIMA
+    } else if (color === COPY_COLORS.ORANGE) {
+        doc.setFillColor(255, 245, 230); // Orange muda untuk ARSIP
+    }
+
     doc.rect(15, 60, 180, 42, 'F');
 
     const detailStartY = 68;
     const detailLineHeight = 7;
 
-    // Left side details
     const leftLabels = [
         { label: "No. Surat", value: formData.noSurat },
-        { label: "Tanggal", value: formData.tanggal },
+        { label: "Tanggal", value: formatTanggal(formData.tanggal) },
         { label: "No. PO", value: formData.noPO }
     ];
 
@@ -81,11 +102,10 @@ const createDocumentDetails = (doc: jsPDFCustom, formData: FormData, color: { r:
         doc.setFont("helvetica", "bold");
     });
 
-    // Right side details
     const rightLabels = [
         { label: "No. Kendaraan", value: formData.noKendaraan },
         { label: "Ekspedisi", value: formData.ekspedisi },
-        { label: "Tujuan", value: formData.tujuan }
+        { label: "Kepada", value: formData.tujuan }
     ];
 
     rightLabels.forEach((item, index) => {
@@ -97,8 +117,6 @@ const createDocumentDetails = (doc: jsPDFCustom, formData: FormData, color: { r:
         doc.setFont("helvetica", "bold");
     });
 };
-
-// Function to create items table with pagination
 const createItemsTable = (
     doc: jsPDFCustom,
     barang: BarangItem[],
@@ -143,7 +161,6 @@ const createItemsTable = (
     });
 };
 
-// Function to create signatures
 const createSignatures = (doc: jsPDFCustom, startY: number): void => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
@@ -206,7 +223,6 @@ const createSignatures = (doc: jsPDFCustom, startY: number): void => {
     });
 };
 
-// Function to create footer
 const createFooter = (
     doc: jsPDFCustom,
     username: string,
@@ -218,12 +234,10 @@ const createFooter = (
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // Colored border
     doc.setDrawColor(color.r, color.g, color.b);
     doc.setLineWidth(0.5);
     doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
 
-    // Footer text
     doc.setFontSize(8);
     doc.setTextColor(128);
     doc.text([
@@ -237,7 +251,6 @@ const createFooter = (
     });
 };
 
-// Main function to generate multi-copy PDF
 export const generateMultiCopyPDF = (
     formData: FormData,
     barang: BarangItem[],
@@ -251,10 +264,10 @@ export const generateMultiCopyPDF = (
 
     const itemsPerPage = 10;
     const copies = [
-        { color: COPY_COLORS.KANTOR, text: "KANTOR" },
-        { color: COPY_COLORS.DRIVER, text: "DRIVER" },
-        { color: COPY_COLORS.CUSTOMER, text: "CUSTOMER" },
-        { color: COPY_COLORS.GUDANG, text: "GUDANG" }
+        { color: COPY_COLORS.BLACK, text: "ACC", textColor: COPY_COLORS.WHITE },
+        { color: COPY_COLORS.PINK, text: "ADM.GUDANG", textColor: COPY_COLORS.BLACK },
+        { color: COPY_COLORS.GREEN, text: "PENERIMA", textColor: COPY_COLORS.BLACK },
+        { color: COPY_COLORS.ORANGE, text: "ARSIP", textColor: COPY_COLORS.BLACK }
     ];
 
     copies.forEach((copy, copyIndex) => {
@@ -265,7 +278,6 @@ export const generateMultiCopyPDF = (
                 doc.addPage();
             }
 
-            // Only create header and document details on first page of each copy
             if (page === 0) {
                 createHeader(doc, copy.color, copy.text);
                 createDocumentDetails(doc, formData, copy.color);
@@ -274,7 +286,6 @@ export const generateMultiCopyPDF = (
             const startIndex = page * itemsPerPage;
             createItemsTable(doc, barang, startIndex, itemsPerPage, copy.color, page === 0);
 
-            // Only create signatures on the last page of each copy
             if (page === totalPages - 1) {
                 const finalY = doc.previousAutoTable.finalY + 10;
                 createSignatures(doc, finalY);
