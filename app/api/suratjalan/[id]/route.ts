@@ -8,31 +8,21 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        // 1. Hapus semua barang terkait terlebih dahulu
-        await db.query(
-            'DELETE FROM barang WHERE suratJalan_id = ?',
-            [params.id]
+        // Langsung hapus data di surat_jalan (barang akan dihapus otomatis jika ON DELETE CASCADE diaktifkan)
+        await db.query('DELETE FROM surat_jalan WHERE id = ?', [params.id]);
+
+        // Jika ON DELETE CASCADE tidak aktif, hapus barang secara eksplisit
+        // await db.query('DELETE FROM barang WHERE suratJalan_id = ?', [params.id]);
+
+        return new Response(
+            JSON.stringify({ success: true, message: 'Surat jalan berhasil dihapus' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
-
-        // 2. Kemudian hapus surat jalan
-        await db.query(
-            'DELETE FROM surat_jalan WHERE id = ?',
-            [params.id]
-        );
-
-        return NextResponse.json({
-            success: true,
-            message: 'Surat jalan dan barang terkait berhasil dihapus'
-        });
-
     } catch (error) {
         console.error('Error deleting surat jalan:', error);
-        return NextResponse.json(
-            {
-                success: false,
-                error: 'Gagal menghapus surat jalan'
-            },
-            { status: 500 }
+        return new Response(
+            JSON.stringify({ success: false, error: 'Gagal menghapus surat jalan' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
     }
 }
