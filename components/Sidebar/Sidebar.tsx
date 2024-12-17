@@ -1,9 +1,11 @@
+// components/Sidebar.tsx
 'use client';
 
 import { useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaBars, FaTimes } from 'react-icons/fa';
+import { BiScan } from 'react-icons/bi'; // Import icon untuk Register Face
 import styles from './Sidebar.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -12,7 +14,7 @@ import { NO_SIDEBAR_ROUTES } from '@/config/route';
 interface SidebarProps {
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
-};
+}
 
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     const pathname = usePathname();
@@ -58,6 +60,22 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                         >
                             <i className="fas fa-envelope"></i>
                             <span>Surat Jalan</span>
+                        </Link>
+                    </li>
+                    <li>
+                        <Link
+                            href="/registerfacerecognition"
+                            className={`${styles.menuItem} ${pathname === '/registerfacerecognition' ? styles.active : ''}`}
+                        >
+                            <BiScan className="text-xl" />
+                            <span className="flex items-center">
+                                Register Face
+                                {!user?.hasFaceRegistration && (
+                                    <span className="ml-2 px-2 py-1 text-xs bg-red-500 text-white rounded-full">
+                                        Required
+                                    </span>
+                                )}
+                            </span>
                         </Link>
                     </li>
                 </ul>

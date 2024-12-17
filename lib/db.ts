@@ -1,8 +1,8 @@
 // lib/db.ts
+// lib/db.ts
 import mysql from 'mysql2/promise';
 
-// Buat pool connection
-const pool = mysql.createPool({
+export const db = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -12,19 +12,19 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-// Export pool sebagai named export
-export const db = pool;
 
-// Optional: helper function
-export async function executeQuery<T>(
-    query: string,
-    params: any[] = []
-): Promise<T> {
+// Test koneksi
+const testConnection = async () => {
     try {
-        const [rows] = await pool.execute(query, params);
-        return rows as T;
+        const connection = await db.getConnection();
+        console.log('Database connected successfully!');
+        connection.release();
+        return true;
     } catch (error) {
-        console.error('Database query error:', error);
-        throw error;
+        console.error('Database connection error:', error);
+        return false;
     }
-}
+};
+
+// Export fungsi test koneksi untuk digunakan di API
+export { db, testConnection };

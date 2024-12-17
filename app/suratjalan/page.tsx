@@ -146,7 +146,7 @@ export default function SuratJalan() {
             if (!suratJalanResponse.ok) {
                 throw new Error(suratJalanResult.error || 'Gagal menyimpan surat jalan');
             }
-
+                p
             // Persiapkan data barang
             const barangData = {
                 suratJalanId: suratJalanResult.data.id,

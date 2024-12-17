@@ -59,7 +59,7 @@ export default function RootLayout({
         );
     }
 
-    // Client side render
+    // Client side render ||
     const mainClassName = mounted
         ? `p-6 ${
             shouldShowSidebar

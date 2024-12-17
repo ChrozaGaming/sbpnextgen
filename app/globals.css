@@ -105,3 +105,34 @@ main {
     padding: 2rem;
   }
 }
+
+/* styles/globals.css */
+video {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-perspective: 1000;
+  perspective: 1000;
+  will-change: transform;
+}
+
+canvas {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-perspective: 1000;
+  perspective: 1000;
+  will-change: transform;
+}
+
+.video-container {
+  transform: translate3d(0,0,0);
+  -webkit-transform: translate3d(0,0,0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  backface-visibility: hidden;
+  perspective: 1000;
+}
+
