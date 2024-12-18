@@ -8,7 +8,7 @@ import {
     createSignatures,
     createFooter,
     generateTableData
-} from './pdfGenerator';
+} from './suratjalan/pdfGenerator/pdfGenerator';
 
 export const    generatePDF = (
     formData: FormData,

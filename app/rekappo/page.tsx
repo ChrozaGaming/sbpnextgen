@@ -2,7 +2,9 @@
 
 import {useState, useEffect} from 'react';
 import BuatRekapPO from '@/components/BuatRekapPO';
+import CetakRekap from '@/components/CetakRekap';
 import type {Company} from '@/app/api/companies/route';
+import InstruksiPanduan from '@/components/InstruksiPanduan';
 
 interface RekapPO {
     id: number;
@@ -56,6 +58,7 @@ const getMonthName = (date: string): string => {
     return months[monthIndex];
 };
 
+
 export default function RekapPOPage() {
     const [rekapPOList, setRekapPOList] = useState<RekapPO[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -66,6 +69,8 @@ export default function RekapPOPage() {
     const [selectedMonth, setSelectedMonth] = useState<string>('all');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isCetakModalOpen, setIsCetakModalOpen] = useState(false);
+    const [showPanduan, setShowPanduan] = useState(false);  // Tambahkan state ini
     const [editingPO, setEditingPO] = useState<RekapPO | null>(null);
     const [newBiayaPelaksanaan, setNewBiayaPelaksanaan] = useState<number>(0);
 
@@ -189,13 +194,56 @@ export default function RekapPOPage() {
         <div className="container mx-auto p-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">Rekap Purchase Order</h1>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-                >
-                    Buat Rekap PO Baru
-                </button>
+                <div className="space-x-2">
+                    <button
+                        onClick={() => setShowPanduan(true)}
+                        className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+                    >
+                        Panduan Penggunaan
+                    </button>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                    >
+                        Buat Rekap PO Baru
+                    </button>
+                    <button
+                        onClick={() => setIsCetakModalOpen(true)}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+                    >
+                        Cetak Rekap
+                    </button>
+                </div>
             </div>
+
+            {/* Modal Panduan */}
+            {showPanduan && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center overflow-y-auto">
+                    <div className="relative bg-white rounded-lg shadow-lg max-w-4xl mx-4 my-8">
+                        <div className="absolute top-4 right-4">
+                            <button
+                                onClick={() => setShowPanduan(false)}
+                                className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                            >
+                                <svg className="h-6 w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto max-h-[80vh]">
+                            <InstruksiPanduan />
+                        </div>
+                        <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
+                            <button
+                                onClick={() => setShowPanduan(false)}
+                                className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                            >
+                                Tutup Panduan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="mb-4 flex space-x-4 items-end">
                 <div className="flex-1">
@@ -242,15 +290,8 @@ export default function RekapPOPage() {
                         )}
                     </div>
                 </div>
-                {searchTerm && (
-                    <button
-                        onClick={() => setSearchTerm('')}
-                        className="p-2 text-gray-500 hover:text-gray-700"
-                    >
-                        Clear
-                    </button>
-                )}
             </div>
+
 
             <div className="mb-4 space-y-4">
                 <div>
@@ -294,6 +335,7 @@ export default function RekapPOPage() {
                 </div>
             </div>
 
+
             {isLoading ? (
                 <div className="text-center py-4">
                     <p>Loading data...</p>
@@ -335,16 +377,13 @@ export default function RekapPOPage() {
                                         <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                                             <div
                                                 className={`${getStatusColor(Number(po.status))} h-4 rounded-full transition-all duration-500 shadow-inner`}
-                                                style={{
-                                                    width: `${Math.abs(po.status)}%`,
-                                                }}
+                                                style={{width: `${Math.abs(po.status)}%`}}
                                             ></div>
                                         </div>
-                                        <span className={`text-sm font-medium min-w-[60px] ${
-                                            po.status < 0 ? 'text-red-600' : 'text-green-600'
-                                        }`}>
-            {Number(po.status).toFixed(2)}%
-        </span>
+                                        <span
+                                            className={`text-sm font-medium min-w-[60px] ${po.status < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {Number(po.status).toFixed(2)}%
+                        </span>
                                     </div>
                                 </td>
                                 <td className="border px-4 py-2">
@@ -431,6 +470,15 @@ export default function RekapPOPage() {
                         fetchRekapPO();
                     }}
                     onCancel={() => setIsCreateModalOpen(false)}
+                />
+            )}
+
+            {isCetakModalOpen && (
+                <CetakRekap
+                    data={filteredRekapPOList}
+                    onClose={() => setIsCetakModalOpen(false)}
+                    selectedYear={selectedYear}
+                    selectedMonth={selectedMonth}
                 />
             )}
         </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import 'jspdf-autotable';
-import { generateMultiCopyPDF } from '@/utils/pdfGenerator';
+import { generateMultiCopyPDF } from '@/utils/suratjalan/pdfGenerator/pdfGenerator';
 import DataSuratJalan from "@/components/DataSuratJalan/DataSuratJalan";
 
 interface BarangItem {

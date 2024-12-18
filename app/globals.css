@@ -136,3 +136,12 @@ canvas {
   perspective: 1000;
 }
 
+.rmsc {
+  --rmsc-main: #2563eb;
+  --rmsc-hover: #f9fafb;
+  --rmsc-selected: #e5e7eb;
+  --rmsc-border: #d1d5db;
+  --rmsc-gray: #6b7280;
+  --rmsc-bg: #ffffff;
+}
+

@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
-import { generateMultiCopyPDF } from '@/utils/pdfGenerator';
+import { generateMultiCopyPDF } from '@/utils/suratjalan/pdfGenerator/pdfGenerator';
 import { FormData, BarangItem } from '@/types/suratJalan';
 import { NextResponse } from 'next/server';
 

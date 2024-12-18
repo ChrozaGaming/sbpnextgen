@@ -1,299 +1,258 @@
-import jsPDF from "jspdf";
-import 'jspdf-autotable';
-import autoTable from 'jspdf-autotable';
-import { FormData, BarangItem } from '@/types/suratJalan';
-import { formatDate } from './dateFormatter';
-const logoPath = '/images/logo.png';
+import { TDocumentDefinitions } from 'pdfmake/interfaces';
+import { fonts } from './fonts';
 
-interface jsPDFCustom extends jsPDF {
-    autoTable: typeof autoTable;
-    previousAutoTable: {
-        finalY: number;
-    };
+export interface RekapPO {
+    id: number;
+    no_po: string;
+    judulPO: string;
+    nama_perusahaan: string;
+    tanggal: string;
+    nilai_po: number;
+    biaya_material: number;
+    biaya_jasa: number;
+    biaya_overhead: number;
+    profit: number;
+    status: number;
 }
 
-function formatTanggal(dateString: string): string {
-    const days = [
-        'Minggu', 'Senin', 'Selasa', 'Rabu',
-        'Kamis', 'Jumat', 'Sabtu'
-    ];
-
-    const months = [
-        'Januari', 'Februari', 'Maret', 'April',
-        'Mei', 'Juni', 'Juli', 'Agustus',
-        'September', 'Oktober', 'November', 'Desember'
-    ];
-
-    const date = new Date(dateString);
-    const dayName = days[date.getDay()];
-    const day = date.getDate();
-    const month = months[date.getMonth()];
-    const year = date.getFullYear();
-
-    return `${dayName}, ${day} ${month} ${year}`;
-}
-
-const COPY_COLORS = {
-    BLACK: { r: 0, g: 0, b: 0 },          // Hitam untuk ACC
-    PINK: { r: 255, g: 192, b: 203 },     // Pink untuk Admin Gudang
-    GREEN: { r: 144, g: 238, b: 144 },    // Hijau untuk Penerima
-    ORANGE: { r: 255, g: 165, b: 0 },     // Orange untuk Arsip
-    WHITE: { r: 255, g: 255, b: 255 }
+const formatPercentage = (value: any): string => {
+    const num = ensureNumber(value);
+    return num.toFixed(1).replace('.', ',') + '%';
 };
 
-const createHeader = (doc: jsPDFCustom, color: { r: number, g: number, b: number }, copyText: string): void => {
-    doc.addImage(logoPath, 'PNG', 15, 15, 25, 25);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("PT. SINAR BUANA PRIMA", 45, 25);
-    doc.text("SURAT JALAN / DELIVERY ORDER", 105, 16, { align: 'center' });
-
-    doc.setFontSize(7);
-    doc.setTextColor(color.r, color.g, color.b);
-    doc.text(`[${copyText}]`, 180, 16);
-    doc.setTextColor(COPY_COLORS.BLACK.r, COPY_COLORS.BLACK.g, COPY_COLORS.BLACK.b);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("General Contractor, Supplier & Trading", 45, 32);
-    doc.text("Jl. Raya Gelam Gg. Kemuning No. 27, Candi - Sidoarjo", 45, 37);
-    doc.text("Telp: 031-8967577 | Fax: 031-8970521", 45, 42);
-    doc.text("Email: sinarbuanaprima@yahoo.co.id", 45, 47);
-
-    doc.setDrawColor(color.r, color.g, color.b);
-    doc.setLineWidth(0.5);
-    doc.line(15, 55, 195, 55);
-};
-
-const createDocumentDetails = (doc: jsPDFCustom, formData: FormData, color: { r: number, g: number, b: number }): void => {
-    doc.setDrawColor(color.r, color.g, color.b);
-
-    // Set warna fill berdasarkan jenis copy
-    if (color === COPY_COLORS.BLACK) {
-        doc.setFillColor(200, 200, 200); // Abu-abu muda untuk ACC
-    } else if (color === COPY_COLORS.PINK) {
-        doc.setFillColor(255, 235, 238); // Pink muda untuk ADM.GUDANG
-    } else if (color === COPY_COLORS.GREEN) {
-        doc.setFillColor(235, 255, 238); // Hijau muda untuk PENERIMA
-    } else if (color === COPY_COLORS.ORANGE) {
-        doc.setFillColor(255, 245, 230); // Orange muda untuk ARSIP
+const ensureNumber = (value: any): number => {
+    if (typeof value === 'string') {
+        value = value.replace(/[^\d.-]/g, '');
     }
-
-    doc.rect(15, 60, 180, 42, 'F');
-
-    const detailStartY = 68;
-    const detailLineHeight = 7;
-
-    const leftLabels = [
-        { label: "No. Surat", value: formData.noSurat },
-        { label: "Tanggal", value: formatTanggal(formData.tanggal) },
-        { label: "No. PO", value: formData.noPO }
-    ];
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-
-    leftLabels.forEach((item, index) => {
-        const y = detailStartY + (index * detailLineHeight);
-        doc.text(item.label, 20, y);
-        doc.text(":", 60, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(item.value, 65, y);
-        doc.setFont("helvetica", "bold");
-    });
-
-    const rightLabels = [
-        { label: "No. Kendaraan", value: formData.noKendaraan },
-        { label: "Ekspedisi", value: formData.ekspedisi },
-        { label: "Kepada", value: formData.tujuan }
-    ];
-
-    rightLabels.forEach((item, index) => {
-        const y = detailStartY + (index * detailLineHeight);
-        doc.text(item.label, 110, y);
-        doc.text(":", 150, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(item.value, 155, y);
-        doc.setFont("helvetica", "bold");
-    });
-};
-const createItemsTable = (
-    doc: jsPDFCustom,
-    barang: BarangItem[],
-    startIndex: number,
-    itemsPerPage: number,
-    color: { r: number, g: number, b: number },
-    isFirstPage: boolean
-): void => {
-    const endIndex = Math.min(startIndex + itemsPerPage, barang.length);
-    const items = barang.slice(startIndex, endIndex);
-
-    doc.autoTable({
-        startY: isFirstPage ? 107 : 30,
-        head: [["No", "Jumlah", "Kemasan", "Kode", "Nama Barang", "Keterangan"]],
-        body: items.map((item, index) => [
-            startIndex + index + 1,
-            item.jumlah,
-            item.kemasan,
-            item.kode,
-            item.nama,
-            item.keterangan,
-        ]),
-        theme: 'grid',
-        headStyles: {
-            fillColor: [color.r, color.g, color.b],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'center',
-            valign: 'middle',
-            fontSize: 10,
-            cellPadding: 3
-        },
-        columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 20 },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 25 },
-            4: { cellWidth: 50 },
-            5: { cellWidth: 40 }
-        },
-        margin: { left: 15, right: 15 }
-    });
+    const num = Number(value);
+    return isNaN(num) ? 0 : num;
 };
 
-const createSignatures = (doc: jsPDFCustom, startY: number): void => {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+const getStatusColor = (status: number): string => {
+    if (status <= -75) return '#7f1d1d';
+    if (status <= -50) return '#991b1b';
+    if (status <= -25) return '#b91c1c';
+    if (status < 0) return '#dc2626';
+    if (status < 25) return '#eab308';
+    if (status < 50) return '#84cc16';
+    if (status < 75) return '#22c55e';
+    return '#059669';
+};
 
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const leftX = pageWidth * 0.2;
-    const centerX = pageWidth * 0.5;
-    const rightX = pageWidth * 0.8;
+const formatRupiah = (amount: any) => {
+    const num = ensureNumber(amount);
+    const isNegative = num < 0;
+    const absoluteNum = Math.abs(num);
+    const formattedNum = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(absoluteNum);
+    const numericPart = formattedNum.replace(/^(IDR|Rp)/i, '').trim();
+    return isNegative ? `Rp -${numericPart}` : `Rp ${numericPart}`;
+};
 
-    const signatures = [
-        {
-            title: "Barang Diterima Oleh:",
-            x: leftX,
-            lines: [
-                "Tgl: _________________",
-                "Nama Jelas / Stempel:",
-                "",
-                "",
-                "_____________________"
-            ]
-        },
-        {
-            title: "Ditandatangani oleh:",
-            x: centerX,
-            lines: [
-                "Sopir:",
-                "",
-                "",
-                "_____________________",
-                "Satpam:",
-                "",
-                "",
-                "_____________________"
-            ]
-        },
-        {
-            title: "Hormat Kami,",
-            x: rightX,
-            lines: [
-                "",
-                "",
-                "_____________________",
-                "",
-                "Nama Jelas",
-                "Pengawas Gudang"
-            ]
-        }
-    ];
-
-    const centerText = (text: string, x: number): number => {
-        const textWidth = doc.getTextWidth(text);
-        return x - (textWidth / 2);
+export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefinitions => {
+    const headerStyle = {
+        fontSize: 10,
+        bold: true,
+        alignment: 'center' as 'center',
+        fillColor: '#f3f4f6'
     };
 
-    signatures.forEach(sig => {
-        doc.text(sig.title, centerText(sig.title, sig.x), startY);
-        sig.lines.forEach((line, index) => {
-            doc.text(line, centerText(line, sig.x), startY + ((index + 1) * 7));
-        });
-    });
-};
+    const records = selectedRecords.sort((a, b) =>
+        a.nama_perusahaan.localeCompare(b.nama_perusahaan)
+    );
 
-const createFooter = (
-    doc: jsPDFCustom,
-    username: string,
-    copyText: string,
-    color: { r: number, g: number, b: number },
-    currentPage: number,
-    totalPages: number
-): void => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
+    const companyGroups = records.reduce((groups, record) => {
+        const group = groups[record.nama_perusahaan] || [];
+        group.push(record);
+        groups[record.nama_perusahaan] = group;
+        return groups;
+    }, {} as { [key: string]: RekapPO[] });
 
-    doc.setDrawColor(color.r, color.g, color.b);
-    doc.setLineWidth(0.5);
-    doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
-
-    doc.setFontSize(8);
-    doc.setTextColor(128);
-    doc.text([
-        `Dicetak pada: ${formatDate()}`,
-        `Dicetak oleh: Admin ${username}`,
-        `Copy: ${copyText}`,
-        `Halaman ${currentPage} dari ${totalPages}`
-    ], pageWidth - 15, pageHeight - 25, {
-        align: 'right',
-        lineHeightFactor: 1.5
-    });
-};
-
-export const generateMultiCopyPDF = (
-    formData: FormData,
-    barang: BarangItem[],
-    username: string
-): jsPDFCustom => {
-    const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-    }) as jsPDFCustom;
-
-    const itemsPerPage = 10;
-    const copies = [
-        { color: COPY_COLORS.BLACK, text: "ACC", textColor: COPY_COLORS.WHITE },
-        { color: COPY_COLORS.PINK, text: "ADM.GUDANG", textColor: COPY_COLORS.BLACK },
-        { color: COPY_COLORS.GREEN, text: "PENERIMA", textColor: COPY_COLORS.BLACK },
-        { color: COPY_COLORS.ORANGE, text: "ARSIP", textColor: COPY_COLORS.BLACK }
+    const mainContent: any[] = [
+        {
+            text: 'REKAP PURCHASE ORDER',
+            style: 'header'
+        },
+        {
+            columns: [
+                {
+                    text: `Periode: ${new Date().toLocaleDateString('id-ID', {
+                        year: 'numeric',
+                        month: 'long'
+                    })}`,
+                    alignment: 'left'
+                },
+                {
+                    text: `Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`,
+                    alignment: 'right'
+                }
+            ],
+            margin: [0, 0, 0, 20]
+        }
     ];
 
-    copies.forEach((copy, copyIndex) => {
-        const totalPages = Math.ceil(barang.length / itemsPerPage);
+    let totalNilaiPO = 0;
+    let totalProfit = 0;
 
-        for (let page = 0; page < totalPages; page++) {
-            if (copyIndex > 0 || page > 0) {
-                doc.addPage();
+    Object.entries(companyGroups).forEach(([companyName, companyRecords]) => {
+        const companyTotals = companyRecords.reduce((acc, record) => ({
+            nilaiPO: acc.nilaiPO + ensureNumber(record.nilai_po),
+            profit: acc.profit + ensureNumber(record.profit)
+        }), { nilaiPO: 0, profit: 0 });
+
+        const companyNilaiPO = companyTotals.nilaiPO;
+        const companyProfit = companyTotals.profit;
+
+        mainContent.push(
+            {
+                text: companyName,
+                style: 'companyName',
+                margin: [0, 10, 0, 5]
+            },
+            {
+                table: {
+                    headerRows: 1,
+                    widths: ['auto', '*', 'auto', 'auto', 'auto', 'auto'],
+                    body: [
+                        [
+                            { text: 'No PO', ...headerStyle },
+                            { text: 'Judul PO', ...headerStyle },
+                            { text: 'Tanggal', ...headerStyle },
+                            { text: 'Nilai PO', ...headerStyle },
+                            { text: 'Profit', ...headerStyle },
+                            { text: 'Status Profit', ...headerStyle }
+                        ],
+                        ...companyRecords.map(record => [
+                            { text: record.no_po },
+                            { text: record.judulPO },
+                            {
+                                text: new Date(record.tanggal).toLocaleDateString('id-ID'),
+                                alignment: 'center'
+                            },
+                            {
+                                text: formatRupiah(record.nilai_po),
+                                alignment: 'right'
+                            },
+                            {
+                                text: formatRupiah(record.profit),
+                                alignment: 'right',
+                                color: ensureNumber(record.profit) < 0 ? 'red' : 'black'
+                            },
+                            {
+                                text: formatPercentage(record.status),
+                                alignment: 'center',
+                                fillColor: getStatusColor(ensureNumber(record.status)),
+                                color: 'white'
+                            }
+                        ])
+                    ]
+                },
+                layout: {
+                    hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+                    vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 1 : 0.5,
+                    hLineColor: (i, node) => (i === 0 || i === node.table.body.length) ? 'black' : '#aaaaaa',
+                    vLineColor: (i, node) => (i === 0 || i === node.table.widths.length) ? 'black' : '#aaaaaa',
+                    paddingLeft: (i) => 4,
+                    paddingRight: (i) => 4,
+                    paddingTop: (i) => 3,
+                    paddingBottom: (i) => 3,
+                }
+            },
+            {
+                columns: [
+                    { text: 'Subtotal:', alignment: 'right', width: '70%', bold: true },
+                    {
+                        text: formatRupiah(companyNilaiPO),
+                        width: '15%',
+                        alignment: 'right',
+                        bold: true
+                    },
+                    {
+                        text: formatRupiah(companyProfit),
+                        width: '15%',
+                        alignment: 'right',
+                        bold: true,
+                        color: companyProfit < 0 ? 'red' : 'black'
+                    }
+                ],
+                margin: [0, 5, 0, 15]
             }
+        );
 
-            if (page === 0) {
-                createHeader(doc, copy.color, copy.text);
-                createDocumentDetails(doc, formData, copy.color);
-            }
-
-            const startIndex = page * itemsPerPage;
-            createItemsTable(doc, barang, startIndex, itemsPerPage, copy.color, page === 0);
-
-            if (page === totalPages - 1) {
-                const finalY = doc.previousAutoTable.finalY + 10;
-                createSignatures(doc, finalY);
-            }
-
-            createFooter(doc, username, copy.text, copy.color, page + 1, totalPages);
-        }
+        totalNilaiPO += companyNilaiPO;
+        totalProfit += companyProfit;
     });
 
-    return doc;
+    mainContent.push(
+        { text: '', margin: [0, 10] },
+        {
+            columns: [
+                { text: 'TOTAL KESELURUHAN:', alignment: 'right', width: '70%', bold: true },
+                {
+                    text: formatRupiah(totalNilaiPO),
+                    width: '15%',
+                    alignment: 'right',
+                    bold: true
+                },
+                {
+                    text: formatRupiah(totalProfit),
+                    width: '15%',
+                    alignment: 'right',
+                    bold: true,
+                    color: totalProfit < 0 ? 'red' : 'black'
+                }
+            ]
+        }
+    );
+
+    // Create signature section as a separate watermark/background element
+
+    return {
+        content: mainContent,
+        styles: {
+            header: {
+                fontSize: 16,
+                bold: true,
+                alignment: 'center',
+                margin: [0, 0, 0, 20]
+            },
+            companyName: {
+                fontSize: 12,
+                bold: true,
+                decoration: 'underline'
+            }
+        },
+        defaultStyle: {
+            fontSize: 10,
+            font: 'Roboto'
+        },
+        pageSize: 'A4',
+        pageOrientation: 'landscape',
+        pageMargins: [40, 40, 40, 60],
+        background: function(currentPage: number, pageCount: number) {
+            return currentPage === pageCount ? signaturePage : null;
+        },
+        footer: function(currentPage: number, pageCount: number) {
+            return {
+                columns: [
+                    {
+                        text: `Dicetak pada: ${new Date().toLocaleString('id-ID')}`,
+                        alignment: 'left',
+                        margin: [40, 0],
+                        fontSize: 8
+                    },
+                    {
+                        text: `Halaman ${currentPage} dari ${pageCount}`,
+                        alignment: 'right',
+                        margin: [0, 0, 40, 0],
+                        fontSize: 8
+                    }
+                ]
+            };
+        }
+    };
 };
