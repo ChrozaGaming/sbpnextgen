@@ -8,6 +8,7 @@ export interface RekapPO {
     nama_perusahaan: string;
     tanggal: string;
     nilai_po: number;
+    biaya_pelaksanaan: number;
     biaya_material: number;
     biaya_jasa: number;
     biaya_overhead: number;
@@ -54,205 +55,307 @@ const formatRupiah = (amount: any) => {
 };
 
 export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefinitions => {
-    const headerStyle = {
-        fontSize: 10,
-        bold: true,
-        alignment: 'center' as 'center',
-        fillColor: '#f3f4f6'
-    };
-
-    const records = selectedRecords.sort((a, b) =>
-        a.nama_perusahaan.localeCompare(b.nama_perusahaan)
-    );
-
-    const companyGroups = records.reduce((groups, record) => {
-        const group = groups[record.nama_perusahaan] || [];
-        group.push(record);
-        groups[record.nama_perusahaan] = group;
-        return groups;
-    }, {} as { [key: string]: RekapPO[] });
-
-    const mainContent: any[] = [
-        {
-            text: 'REKAP PURCHASE ORDER',
-            style: 'header'
-        },
-        {
-            columns: [
-                {
-                    text: `Periode: ${new Date().toLocaleDateString('id-ID', {
-                        year: 'numeric',
-                        month: 'long'
-                    })}`,
-                    alignment: 'left'
-                },
-                {
-                    text: `Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`,
-                    alignment: 'right'
-                }
-            ],
-            margin: [0, 0, 0, 20]
-        }
-    ];
-
     let totalNilaiPO = 0;
+    let totalBiayaPelaksanaan = 0;
     let totalProfit = 0;
+    let totalStatusAccumulator = 0;
+    let totalCount = 0;
 
-    Object.entries(companyGroups).forEach(([companyName, companyRecords]) => {
-        const companyTotals = companyRecords.reduce((acc, record) => ({
-            nilaiPO: acc.nilaiPO + ensureNumber(record.nilai_po),
-            profit: acc.profit + ensureNumber(record.profit)
-        }), { nilaiPO: 0, profit: 0 });
-
-        const companyNilaiPO = companyTotals.nilaiPO;
-        const companyProfit = companyTotals.profit;
-
-        mainContent.push(
-            {
-                text: companyName,
-                style: 'companyName',
-                margin: [0, 10, 0, 5]
-            },
-            {
-                table: {
-                    headerRows: 1,
-                    widths: ['auto', '*', 'auto', 'auto', 'auto', 'auto'],
-                    body: [
-                        [
-                            { text: 'No PO', ...headerStyle },
-                            { text: 'Judul PO', ...headerStyle },
-                            { text: 'Tanggal', ...headerStyle },
-                            { text: 'Nilai PO', ...headerStyle },
-                            { text: 'Profit', ...headerStyle },
-                            { text: 'Status Profit', ...headerStyle }
-                        ],
-                        ...companyRecords.map(record => [
-                            { text: record.no_po },
-                            { text: record.judulPO },
-                            {
-                                text: new Date(record.tanggal).toLocaleDateString('id-ID'),
-                                alignment: 'center'
-                            },
-                            {
-                                text: formatRupiah(record.nilai_po),
-                                alignment: 'right'
-                            },
-                            {
-                                text: formatRupiah(record.profit),
-                                alignment: 'right',
-                                color: ensureNumber(record.profit) < 0 ? 'red' : 'black'
-                            },
-                            {
-                                text: formatPercentage(record.status),
-                                alignment: 'center',
-                                fillColor: getStatusColor(ensureNumber(record.status)),
-                                color: 'white'
-                            }
-                        ])
-                    ]
-                },
-                layout: {
-                    hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
-                    vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 1 : 0.5,
-                    hLineColor: (i, node) => (i === 0 || i === node.table.body.length) ? 'black' : '#aaaaaa',
-                    vLineColor: (i, node) => (i === 0 || i === node.table.widths.length) ? 'black' : '#aaaaaa',
-                    paddingLeft: (i) => 4,
-                    paddingRight: (i) => 4,
-                    paddingTop: (i) => 3,
-                    paddingBottom: (i) => 3,
+    if (!Array.isArray(selectedRecords) || selectedRecords.length === 0) {
+        console.error('No records provided or invalid data format');
+        return {
+            content: [{
+                text: 'Tidak ada data yang dapat ditampilkan',
+                style: 'header',
+                alignment: 'center'
+            }],
+            styles: {
+                header: {
+                    fontSize: 16,
+                    bold: true,
+                    margin: [0, 150, 0, 0]
                 }
+            },
+            pageSize: 'A4',
+            pageOrientation: 'landscape'
+        };
+    }
+
+    try {
+        const headerStyle = {
+            fontSize: 10,
+            bold: true,
+            alignment: 'center' as 'center',
+            fillColor: '#f3f4f6'
+        };
+
+        // Modifikasi sorting untuk mengurutkan berdasarkan tanggal
+        const records = selectedRecords
+            .sort((a, b) => {
+                // Pertama urutkan berdasarkan nama perusahaan
+                const companyComparison = a.nama_perusahaan.localeCompare(b.nama_perusahaan);
+                if (companyComparison !== 0) return companyComparison;
+
+                // Jika nama perusahaan sama, urutkan berdasarkan tanggal
+                const dateA = new Date(a.tanggal).getTime();
+                const dateB = new Date(b.tanggal).getTime();
+                return dateA - dateB; // Urutkan dari tanggal lama ke baru
+            });
+
+        const companyGroups = records.reduce((groups, record) => {
+            const group = groups[record.nama_perusahaan] || [];
+            group.push(record);
+            groups[record.nama_perusahaan] = group;
+            return groups;
+        }, {} as { [key: string]: RekapPO[] });
+
+        const mainContent: any[] = [
+            {
+                text: 'REKAP PURCHASE ORDER',
+                style: 'header'
             },
             {
                 columns: [
-                    { text: 'Subtotal:', alignment: 'right', width: '70%', bold: true },
                     {
-                        text: formatRupiah(companyNilaiPO),
+                        text: `Periode: ${new Date().toLocaleDateString('id-ID', {
+                            year: 'numeric',
+                            month: 'long'
+                        })}`,
+                        alignment: 'left'
+                    },
+                    {
+                        text: `Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`,
+                        alignment: 'right'
+                    }
+                ],
+                margin: [0, 0, 0, 20]
+            }
+        ];
+        Object.entries(companyGroups).forEach(([companyName, companyRecords]) => {
+            const companyTotals = companyRecords.reduce((acc, record) => ({
+                nilaiPO: acc.nilaiPO + ensureNumber(record.nilai_po),
+                biayaPelaksanaan: acc.biayaPelaksanaan + ensureNumber(record.biaya_pelaksanaan),
+                profit: acc.profit + ensureNumber(record.profit),
+                statusTotal: acc.statusTotal + ensureNumber(record.status),
+                count: acc.count + 1
+            }), { nilaiPO: 0, biayaPelaksanaan: 0, profit: 0, statusTotal: 0, count: 0 });
+
+            const companyNilaiPO = companyTotals.nilaiPO;
+            const companyBiayaPelaksanaan = companyTotals.biayaPelaksanaan;
+            const companyProfit = companyTotals.profit;
+            const companyStatusAvg = companyTotals.statusTotal / companyTotals.count;
+
+            mainContent.push(
+                {
+                    text: companyName,
+                    style: 'companyName',
+                    margin: [0, 10, 0, 5]
+                },
+                {
+                    table: {
+                        headerRows: 1,
+                        widths: ['10%', '30%', '10%', '15%', '15%', '20%'],
+                        body: [
+                            [
+                                { text: 'No PO', ...headerStyle },
+                                { text: 'Judul PO', ...headerStyle },
+                                { text: 'Tanggal', ...headerStyle },
+                                { text: 'Nilai PO', ...headerStyle },
+                                { text: 'Biaya Pelaksanaan', ...headerStyle },
+                                { text: 'Profit', ...headerStyle }
+                            ],
+                            ...companyRecords.map(record => [
+                                { text: record.no_po },
+                                { text: record.judulPO },
+                                {
+                                    text: new Date(record.tanggal).toLocaleDateString('id-ID'),
+                                    alignment: 'center'
+                                },
+                                {
+                                    text: formatRupiah(record.nilai_po),
+                                    alignment: 'right'
+                                },
+                                {
+                                    text: formatRupiah(record.biaya_pelaksanaan),
+                                    alignment: 'right'
+                                },
+                                {
+                                    stack: [
+                                        {
+                                            text: formatRupiah(record.profit),
+                                            alignment: 'right',
+                                            color: ensureNumber(record.profit) < 0 ? 'red' : 'black'
+                                        },
+                                        {
+                                            text: formatPercentage(record.status),
+                                            alignment: 'right',
+                                            fontSize: 8,
+                                            color: 'white',
+                                            background: getStatusColor(ensureNumber(record.status)),
+                                            margin: [0, 2, 0, 0]
+                                        }
+                                    ]
+                                }
+                            ])
+                        ]
+                    },
+                    layout: {
+                        hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+                        vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 1 : 0.5,
+                        hLineColor: (i, node) => (i === 0 || i === node.table.body.length) ? 'black' : '#aaaaaa',
+                        vLineColor: (i, node) => (i === 0 || i === node.table.widths.length) ? 'black' : '#aaaaaa',
+                        paddingLeft: (i) => 4,
+                        paddingRight: (i) => 4,
+                        paddingTop: (i) => 3,
+                        paddingBottom: (i) => 3,
+                    }
+                },
+                {
+                    columns: [
+                        { text: 'Subtotal:', alignment: 'right', width: '50%', bold: true },
+                        {
+                            text: formatRupiah(companyNilaiPO),
+                            width: '15%',
+                            alignment: 'right',
+                            bold: true
+                        },
+                        {
+                            text: formatRupiah(companyBiayaPelaksanaan),
+                            width: '15%',
+                            alignment: 'right',
+                            bold: true
+                        },
+                        {
+                            stack: [
+                                {
+                                    text: formatRupiah(companyProfit),
+                                    alignment: 'right',
+                                    bold: true,
+                                    color: companyProfit < 0 ? 'red' : 'black'
+                                },
+                                {
+                                    text: formatPercentage(companyStatusAvg),
+                                    alignment: 'right',
+                                    fontSize: 8,
+                                    color: 'white',
+                                    background: getStatusColor(companyStatusAvg),
+                                    margin: [0, 2, 0, 0]
+                                }
+                            ],
+                            width: '20%'
+                        }
+                    ],
+                    margin: [0, 5, 0, 15]
+                }
+            );
+
+            totalNilaiPO += companyNilaiPO;
+            totalBiayaPelaksanaan += companyBiayaPelaksanaan;
+            totalProfit += companyProfit;
+            totalStatusAccumulator += companyTotals.statusTotal;
+            totalCount += companyTotals.count;
+        });
+
+        const finalStatusAvg = totalStatusAccumulator / totalCount;
+
+        mainContent.push(
+            { text: '', margin: [0, 10] },
+            {
+                columns: [
+                    { text: 'TOTAL KESELURUHAN:', alignment: 'right', width: '50%', bold: true },
+                    {
+                        text: formatRupiah(totalNilaiPO),
                         width: '15%',
                         alignment: 'right',
                         bold: true
                     },
                     {
-                        text: formatRupiah(companyProfit),
+                        text: formatRupiah(totalBiayaPelaksanaan),
                         width: '15%',
                         alignment: 'right',
-                        bold: true,
-                        color: companyProfit < 0 ? 'red' : 'black'
+                        bold: true
+                    },
+                    {
+                        stack: [
+                            {
+                                text: formatRupiah(totalProfit),
+                                alignment: 'right',
+                                bold: true,
+                                color: totalProfit < 0 ? 'red' : 'black'
+                            },
+                            {
+                                text: formatPercentage(finalStatusAvg),
+                                alignment: 'right',
+                                fontSize: 8,
+                                color: 'white',
+                                background: getStatusColor(finalStatusAvg),
+                                margin: [0, 2, 0, 0]
+                            }
+                        ],
+                        width: '20%'
                     }
-                ],
-                margin: [0, 5, 0, 15]
+                ]
             }
         );
 
-        totalNilaiPO += companyNilaiPO;
-        totalProfit += companyProfit;
-    });
-
-    mainContent.push(
-        { text: '', margin: [0, 10] },
-        {
-            columns: [
-                { text: 'TOTAL KESELURUHAN:', alignment: 'right', width: '70%', bold: true },
-                {
-                    text: formatRupiah(totalNilaiPO),
-                    width: '15%',
-                    alignment: 'right',
-                    bold: true
-                },
-                {
-                    text: formatRupiah(totalProfit),
-                    width: '15%',
-                    alignment: 'right',
+        return {
+            content: mainContent,
+            styles: {
+                header: {
+                    fontSize: 16,
                     bold: true,
-                    color: totalProfit < 0 ? 'red' : 'black'
+                    alignment: 'center',
+                    margin: [0, 0, 0, 20]
+                },
+                companyName: {
+                    fontSize: 12,
+                    bold: true,
+                    decoration: 'underline'
                 }
-            ]
-        }
-    );
-
-    // Create signature section as a separate watermark/background element
-
-    return {
-        content: mainContent,
-        styles: {
-            header: {
-                fontSize: 16,
-                bold: true,
-                alignment: 'center',
-                margin: [0, 0, 0, 20]
             },
-            companyName: {
-                fontSize: 12,
-                bold: true,
-                decoration: 'underline'
+            defaultStyle: {
+                fontSize: 10,
+                font: 'Roboto'
+            },
+            pageSize: 'A4',
+            pageOrientation: 'landscape',
+            pageMargins: [40, 40, 40, 60],
+            footer: function(currentPage: number, pageCount: number) {
+                return {
+                    columns: [
+                        {
+                            text: `Dicetak pada: ${new Date().toLocaleString('id-ID')}`,
+                            alignment: 'left',
+                            margin: [40, 0],
+                            fontSize: 8
+                        },
+                        {
+                            text: `Halaman ${currentPage} dari ${pageCount}`,
+                            alignment: 'right',
+                            margin: [0, 0, 40, 0],
+                            fontSize: 8
+                        }
+                    ]
+                };
             }
-        },
-        defaultStyle: {
-            fontSize: 10,
-            font: 'Roboto'
-        },
-        pageSize: 'A4',
-        pageOrientation: 'landscape',
-        pageMargins: [40, 40, 40, 60],
-        background: function(currentPage: number, pageCount: number) {
-            return currentPage === pageCount ? signaturePage : null;
-        },
-        footer: function(currentPage: number, pageCount: number) {
-            return {
-                columns: [
-                    {
-                        text: `Dicetak pada: ${new Date().toLocaleString('id-ID')}`,
-                        alignment: 'left',
-                        margin: [40, 0],
-                        fontSize: 8
-                    },
-                    {
-                        text: `Halaman ${currentPage} dari ${pageCount}`,
-                        alignment: 'right',
-                        margin: [0, 0, 40, 0],
-                        fontSize: 8
-                    }
-                ]
-            };
-        }
-    };
+        };
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        return {
+            content: [{
+                text: 'Terjadi kesalahan saat memproses data',
+                style: 'header',
+                alignment: 'center'
+            }],
+            styles: {
+                header: {
+                    fontSize: 16,
+                    bold: true,
+                    margin: [0, 150, 0, 0]
+                }
+            },
+            pageSize: 'A4',
+            pageOrientation: 'landscape'
+        };
+    }
 };
