@@ -9,6 +9,16 @@ export async function PUT(
         const id = params.id;
         const data = await request.json();
 
+        // Check if this is a progress update
+        if (data.progress) {
+            const [result] = await db.execute(
+                'UPDATE rekap_po SET progress = ? WHERE id = ?',
+                [data.progress, id]
+            );
+            return NextResponse.json({ success: true, data: result });
+        }
+
+        // If not progress update, handle the existing biaya_pelaksanaan update
         const [result] = await db.execute(
             `UPDATE rekap_po 
              SET biaya_pelaksanaan = ?,

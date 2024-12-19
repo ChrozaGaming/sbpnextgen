@@ -56,19 +56,26 @@ export default function DataStokMasuk() {
 
     const sortData = (data: StokData[]) => {
         return [...data].sort((a, b) => {
-            let aValue = a[sortConfig.key] || '';
-            let bValue = b[sortConfig.key] || '';
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
 
+            // Handle undefined or null values
+            if (aValue === undefined || aValue === null) return 1;
+            if (bValue === undefined || bValue === null) return -1;
+
+            // Case-insensitive sorting for strings
             if (typeof aValue === 'string') {
-                aValue = aValue.toLowerCase()
-                bValue = bValue.toLowerCase()
+                aValue = aValue.toLowerCase();
+                bValue = bValue.toLowerCase();
             }
 
+            // Sorting logic
             if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
         });
-    }
+    };
+
 
     const handleSort = (key: keyof StokData) => {
         setSortConfig(current => ({
@@ -78,9 +85,16 @@ export default function DataStokMasuk() {
     }
 
     const getSortIcon = (key: keyof StokData) => {
-        if (sortConfig.key !== key) return '↕️'
-        return sortConfig.direction === 'asc' ? '↑' : '↓'
-    }
+        if (sortConfig.key !== key) {
+            return <span className="text-gray-400 ml-2">↕️</span>;
+        }
+        return sortConfig.direction === 'asc' ? (
+            <span className="text-blue-600 ml-2">↑</span>
+        ) : (
+            <span className="text-blue-600 ml-2">↓</span>
+        );
+    };
+
 
     const paginateData = (items: StokData[]) => {
         const startIndex = (currentPage - 1) * itemsPerPage
@@ -198,73 +212,82 @@ export default function DataStokMasuk() {
                                 <table className="min-w-full table-auto">
                                     <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => handleSort('kode')}>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('kode')}
+                                        >
                                             Kode {getSortIcon('kode')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => handleSort('nama')}>
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('nama')}
+                                        >
                                             Nama {getSortIcon('nama')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Kategori
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('kategori')}
+                                        >
+                                            Kategori {getSortIcon('kategori')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Brand
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('brand')}
+                                        >
+                                            Brand {getSortIcon('brand')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Stok Masuk
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('stok_masuk')}
+                                        >
+                                            Stok Masuk {getSortIcon('stok_masuk')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Satuan
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('satuan')}
+                                        >
+                                            Satuan {getSortIcon('satuan')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('status')}
+                                        >
+                                            Status {getSortIcon('status')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Lokasi
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('lokasi')}
+                                        >
+                                            Lokasi {getSortIcon('lokasi')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Tanggal Masuk
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('tanggal_masuk')}
+                                        >
+                                            Tanggal Masuk {getSortIcon('tanggal_masuk')}
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Keterangan
+                                        <th
+                                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => handleSort('keterangan')}
+                                        >
+                                            Keterangan {getSortIcon('keterangan')}
                                         </th>
                                     </tr>
                                     </thead>
+
                                     <tbody className="bg-white divide-y divide-gray-200">
                                     {paginatedData.map((item) => (
                                         <tr key={item.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.kode}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.nama}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.kategori}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.brand || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.stok_masuk}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.satuan}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.status || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.lokasi || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.tanggal_masuk || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {item.keterangan || '-'}
-                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.kode}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.nama}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.kategori}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.brand || '-'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.stok_masuk}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.satuan}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.status || '-'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.lokasi || '-'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.tanggal_masuk || '-'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{item.keterangan || '-'}</td>
                                         </tr>
                                     ))}
                                     </tbody>
@@ -277,7 +300,7 @@ export default function DataStokMasuk() {
                                     Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
                                 </div>
                                 <div className="flex gap-2">
-                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                    {Array.from({length: totalPages}, (_, i) => i + 1).map((page) => (
                                         <button
                                             key={page}
                                             onClick={() => handlePageChange(page)}

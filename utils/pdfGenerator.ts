@@ -14,6 +14,7 @@ export interface RekapPO {
     biaya_overhead: number;
     profit: number;
     status: number;
+    progress: 'onprogress' | 'finish';  // Add progress field
 }
 
 const formatPercentage = (value: any): string => {
@@ -131,6 +132,7 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
                 margin: [0, 0, 0, 20]
             }
         ];
+
         Object.entries(companyGroups).forEach(([companyName, companyRecords]) => {
             const companyTotals = companyRecords.reduce((acc, record) => ({
                 nilaiPO: acc.nilaiPO + ensureNumber(record.nilai_po),
@@ -154,12 +156,14 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
                 {
                     table: {
                         headerRows: 1,
-                        widths: ['10%', '30%', '10%', '15%', '15%', '20%'],
+                        // Update widths to accommodate new progress column
+                        widths: ['10%', '25%', '10%', '10%', '15%', '15%', '15%'],
                         body: [
                             [
                                 { text: 'No PO', ...headerStyle },
                                 { text: 'Judul PO', ...headerStyle },
                                 { text: 'Tanggal', ...headerStyle },
+                                { text: 'Progress', ...headerStyle },
                                 { text: 'Nilai PO', ...headerStyle },
                                 { text: 'Biaya Pelaksanaan', ...headerStyle },
                                 { text: 'Profit', ...headerStyle }
@@ -170,6 +174,11 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
                                 {
                                     text: new Date(record.tanggal).toLocaleDateString('id-ID'),
                                     alignment: 'center'
+                                },
+                                {
+                                    text: record.progress === 'finish' ? 'Finish' : 'On Progress',
+                                    alignment: 'center',
+                                    fillColor: record.progress === 'finish' ? '#dcfce7' : '#fef9c3'
                                 },
                                 {
                                     text: formatRupiah(record.nilai_po),
@@ -204,12 +213,21 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
                         vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 1 : 0.5,
                         hLineColor: (i, node) => (i === 0 || i === node.table.body.length) ? 'black' : '#aaaaaa',
                         vLineColor: (i, node) => (i === 0 || i === node.table.widths.length) ? 'black' : '#aaaaaa',
+                        fillColor: function(rowIndex, node, columnIndex) {
+                            if (rowIndex === 0) return '#f3f4f6';
+                            if (columnIndex === 3) {
+                                const record = companyRecords[rowIndex - 1];
+                                return record.progress === 'finish' ? '#dcfce7' : '#fef9c3';
+                            }
+                            return null;
+                        },
                         paddingLeft: (i) => 4,
                         paddingRight: (i) => 4,
                         paddingTop: (i) => 3,
                         paddingBottom: (i) => 3,
                     }
                 },
+
                 {
                     columns: [
                         { text: 'Subtotal:', alignment: 'right', width: '50%', bold: true },

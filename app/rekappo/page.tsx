@@ -12,6 +12,7 @@ interface RekapPO {
     judulPO: string;
     tanggal: string;
     status: number;
+    progress: 'onprogress' | 'finish';  // Add this line
     nilai_penawaran: number;
     nilai_po: number;
     biaya_pelaksanaan: number;
@@ -73,6 +74,7 @@ export default function RekapPOPage() {
     const [showPanduan, setShowPanduan] = useState(false);  // Tambahkan state ini
     const [editingPO, setEditingPO] = useState<RekapPO | null>(null);
     const [newBiayaPelaksanaan, setNewBiayaPelaksanaan] = useState<number>(0);
+    const [updatingProgressId, setUpdatingProgressId] = useState<number | null>(null);
 
     useEffect(() => {
         fetchRekapPO();
@@ -118,6 +120,39 @@ export default function RekapPOPage() {
         setIsEditModalOpen(true);
     };
 
+    const handleUpdateProgress = async (id: number, newProgress: 'onprogress' | 'finish') => {
+        if (updatingProgressId === id) return; // Prevent double submissions
+
+        setUpdatingProgressId(id);
+        try {
+            const response = await fetch(`/api/rekap-po/${id}/progress`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ progress: newProgress }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update progress');
+            }
+
+            // Update the local state immediately
+            setRekapPOList(prevList =>
+                prevList.map(po =>
+                    po.id === id
+                        ? { ...po, progress: newProgress }
+                        : po
+                )
+            );
+        } catch (error) {
+            console.error('Error updating progress:', error);
+            alert('Gagal mengupdate progress');
+        } finally {
+            setUpdatingProgressId(null);
+        }
+    };
+
     const handleUpdateBiayaPelaksanaan = async () => {
         if (!editingPO) return;
 
@@ -134,7 +169,8 @@ export default function RekapPOPage() {
                 id: editingPO.id,
                 biaya_pelaksanaan: newBiayaPelaksanaan,
                 profit: profit,
-                status: status
+                status: status,
+                progress: editingPO.progress  // Add this line
             };
 
             const response = await fetch(`/api/rekap-po/${editingPO.id}`, {
@@ -185,6 +221,8 @@ export default function RekapPOPage() {
                 return po.tanggal.includes(searchValue);
             case 'status':
                 return po.status.toString().includes(searchValue);
+            case 'progress':  // Add this case
+                return po.progress.toLowerCase().includes(searchValue);
             default:
                 return true;
         }
@@ -349,6 +387,7 @@ export default function RekapPOPage() {
                             <th className="px-4 py-2">Perusahaan</th>
                             <th className="px-4 py-2">Judul PO</th>
                             <th className="px-4 py-2">Tanggal</th>
+                            <th className="px-4 py-2 min-w-[160px]">Progress</th>
                             <th className="px-4 py-2">Nilai Penawaran</th>
                             <th className="px-4 py-2">Nilai PO</th>
                             <th className="px-4 py-2">Biaya Pelaksanaan</th>
@@ -357,14 +396,28 @@ export default function RekapPOPage() {
                             <th className="px-4 py-2">Aksi</th>
                         </tr>
                         </thead>
-                        <tbody>
-                        {filteredRekapPOList.map((po) => (
+                        <tbody>{filteredRekapPOList.map((po) => (
                             <tr key={po.id}>
                                 <td className="border px-4 py-2">{po.no_po}</td>
                                 <td className="border px-4 py-2">{po.nama_perusahaan}</td>
                                 <td className="border px-4 py-2">{po.judulPO}</td>
                                 <td className="border px-4 py-2">
                                     {new Date(po.tanggal).toLocaleDateString('id-ID')}
+                                </td>
+                                <td className="border px-4 py-2 min-w-[120px]">
+                                    <select
+                                        value={po.progress}
+                                        onChange={(e) => handleUpdateProgress(po.id, e.target.value as 'onprogress' | 'finish')}
+                                        disabled={updatingProgressId === po.id}
+                                        className={`px-2 py-1 rounded text-sm w-full border-0 transition-colors duration-200 ${
+                                            po.progress === 'finish'
+                                                ? 'bg-green-100 text-green-800'
+                                                : 'bg-yellow-100 text-yellow-800'
+                                        } ${updatingProgressId === po.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        <option value="onprogress">On Progress</option>
+                                        <option value="finish">Finish</option>
+                                    </select>
                                 </td>
                                 <td className="border px-4 py-2">{formatRupiah(po.nilai_penawaran)}</td>
                                 <td className="border px-4 py-2">{formatRupiah(po.nilai_po)}</td>
@@ -377,26 +430,22 @@ export default function RekapPOPage() {
                                         <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                                             <div
                                                 className={`${getStatusColor(Number(po.status))} h-4 rounded-full transition-all duration-500 shadow-inner`}
-                                                style={{width: `${Math.abs(po.status)}%`}}
-                                            ></div>
+                                                style={{width: `${Math.abs(po.status)}%`}}/>
                                         </div>
                                         <span
                                             className={`text-sm font-medium min-w-[60px] ${po.status < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {Number(po.status).toFixed(2)}%
-                        </span>
+                        {Number(po.status).toFixed(2)}%
+                    </span>
                                     </div>
                                 </td>
                                 <td className="border px-4 py-2">
-                                    <button
-                                        onClick={() => handleEdit(po)}
-                                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
-                                    >
+                                    <button onClick={() => handleEdit(po)}
+                                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
                                         Edit Biaya
                                     </button>
                                 </td>
                             </tr>
-                        ))}
-                        </tbody>
+                        ))}</tbody>
                     </table>
                 </div>
             )}
@@ -440,10 +489,12 @@ export default function RekapPOPage() {
                                     Profit: {formatRupiah(editingPO.nilai_po - newBiayaPelaksanaan, true)}
                                 </p>
                                 <p className={`text-sm ${((editingPO.nilai_po - newBiayaPelaksanaan) / newBiayaPelaksanaan * 100) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    Status Profit: {((editingPO.nilai_po - newBiayaPelaksanaan) / newBiayaPelaksanaan * 100).toFixed(2)}%
+                                    Status
+                                    Profit: {((editingPO.nilai_po - newBiayaPelaksanaan) / newBiayaPelaksanaan * 100).toFixed(2)}%
                                 </p>
                             </div>
                         </div>
+
 
                         <div className="flex justify-end space-x-2">
                             <button

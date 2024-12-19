@@ -20,7 +20,6 @@ interface CetakRekapProps {
     onClose: () => void;
     data: RekapPO[];
 }
-
 const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data }) => {
     const [companies, setCompanies] = useState<CompanyOption[]>([]);
     const [selected, setSelected] = useState<CompanyOption[]>([]);
@@ -31,6 +30,12 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedYear, setSelectedYear] = useState<string>('');
     const [selectedMonth, setSelectedMonth] = useState<string>('');
+
+    const getProgressBadgeStyle = (progress: 'onprogress' | 'finish') => {
+        return progress === 'finish'
+            ? 'bg-green-100 text-green-800'
+            : 'bg-yellow-100 text-yellow-800';
+    };
 
     const getYears = () => {
         const years = new Set(data.map(record =>
@@ -277,6 +282,7 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data }) => {
                                                 <th className="px-4 py-2">No PO</th>
                                                 <th className="px-4 py-2">Judul PO</th>
                                                 <th className="px-4 py-2">Tanggal</th>
+                                                <th className="px-4 py-2">Progress</th>
                                                 <th className="px-4 py-2">Nilai PO</th>
                                                 <th className="px-4 py-2">Profit</th>
                                                 <th className="px-4 py-2">Status</th>
@@ -297,6 +303,13 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data }) => {
                                                     <td className="border px-4 py-2">{record.judulPO}</td>
                                                     <td className="border px-4 py-2">
                                                         {new Date(record.tanggal).toLocaleDateString('id-ID')}
+                                                    </td>
+                                                    <td className="border px-4 py-2">
+                                                        <span className={`px-2 py-1 rounded-full text-sm ${
+                                                            getProgressBadgeStyle(record.progress)
+                                                        }`}>
+                                                            {record.progress === 'finish' ? 'Finish' : 'On Progress'}
+                                                        </span>
                                                     </td>
                                                     <td className="border px-4 py-2">{formatRupiah(record.nilai_po)}</td>
                                                     <td className={`border px-4 py-2 ${
@@ -356,5 +369,6 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data }) => {
         </div>
     );
 };
+
 
 export default CetakRekap;

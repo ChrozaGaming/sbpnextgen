@@ -4,9 +4,10 @@ import { useState } from "react"
 import DataStokMasuk from "@/components/stokgudang/StokMasuk/DataStokMasuk"
 import DataStokKeluar from "@/components/stokgudang/StokKeluar/DataStokKeluar"
 import StokGudang from "@/components/stokgudang/StokGudang/StokGudang"
+import TambahProduk from "@/components/stokgudang/TambahProduk/TambahProduk"
 
 export default function StokGudangPage() {
-    const [activeTab, setActiveTab] = useState<'all' | 'masuk' | 'keluar'>('all')
+    const [activeTab, setActiveTab] = useState<'all' | 'masuk' | 'keluar' | 'tambah'>('all')
 
     const tabStyle = (isActive: boolean) => ({
         padding: "8px 16px",
@@ -48,12 +49,19 @@ export default function StokGudangPage() {
                 >
                     Stok Keluar
                 </button>
+                <button
+                    onClick={() => setActiveTab('tambah')}
+                    style={tabStyle(activeTab === 'tambah')}
+                >
+                    Tambah Produk
+                </button>
             </div>
 
             <div>
                 {activeTab === 'all' && <StokGudang />}
                 {activeTab === 'masuk' && <DataStokMasuk />}
                 {activeTab === 'keluar' && <DataStokKeluar />}
+                {activeTab === 'tambah' && <TambahProduk />}
             </div>
         </div>
     )

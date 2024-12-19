@@ -4,6 +4,11 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
     try {
+        // Verify database connection first
+        if (!db) {
+            throw new Error("Database connection not established")
+        }
+
         const [rows] = await db.execute(`
             SELECT 
                 s.*,
@@ -16,11 +21,18 @@ export async function GET() {
             ORDER BY s.kode ASC
         `);
 
-        if (!rows || (Array.isArray(rows) && rows.length === 0)) {
-            return NextResponse.json(
-                { error: "No data found" },
-                { status: 404 }
-            );
+        if (!rows) {
+            return NextResponse.json({
+                status: "error",
+                error: "No data returned from database"
+            }, { status: 404 });
+        }
+
+        if (Array.isArray(rows) && rows.length === 0) {
+            return NextResponse.json({
+                status: "success",
+                data: []
+            });
         }
 
         const formattedData = (rows as any[]).map((item) => ({
@@ -29,20 +41,20 @@ export async function GET() {
             nama: item.nama,
             kategori: item.kategori,
             sub_kategori: {
-                kode: item.kode_item,
-                nama: item.sub_kategori_nama,
-                brand: item.brand,
-                status: item.status
+                kode: item.kode_item || '',
+                nama: item.sub_kategori_nama || '',
+                brand: item.brand || '',
+                status: item.status || 'aman'
             },
             stok: {
-                masuk: item.stok_masuk,
-                keluar: item.stok_keluar,
-                sisa: item.stok_sisa,
-                satuan: item.satuan
+                masuk: Number(item.stok_masuk) || 0,
+                keluar: Number(item.stok_keluar) || 0,
+                sisa: Number(item.stok_sisa) || 0,
+                satuan: item.satuan || 'pcs'
             },
-            lokasi: item.lokasi,
+            lokasi: item.lokasi || '',
             tanggal: {
-                entry: item.tanggal_entry,
+                entry: item.tanggal_entry || new Date().toISOString(),
                 masuk: item.tanggal_masuk,
                 keluar: item.tanggal_keluar
             }
@@ -53,11 +65,15 @@ export async function GET() {
             data: formattedData
         });
 
-    } catch (error) {
-        console.error("Error fetching all stock data:", error);
-        return NextResponse.json(
-            { error: "Internal Server Error" },
-            { status: 500 }
-        );
+    } catch (error: any) {
+        console.error("Database Error:", error);
+
+        return NextResponse.json({
+            status: "error",
+            error: error.message || "Internal Server Error",
+            details: process.env.NODE_ENV === 'development' ? error : undefined
+        }, {
+            status: 500
+        });
     }
 }

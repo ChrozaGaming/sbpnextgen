@@ -18,6 +18,7 @@ interface FormData {
     nilai_po: string;
     biaya_pelaksanaan: string;
     keterangan: string;
+    progress: 'onprogress' | 'finish';
 }
 
 const BuatRekapPO: React.FC<BuatRekapPOProps> = ({ onSave, onCancel }) => {
@@ -33,6 +34,7 @@ const BuatRekapPO: React.FC<BuatRekapPOProps> = ({ onSave, onCancel }) => {
         nilai_po: '',
         biaya_pelaksanaan: '',
         keterangan: '',
+        progress: 'onprogress'
     });
 
     useEffect(() => {
@@ -72,7 +74,7 @@ const BuatRekapPO: React.FC<BuatRekapPOProps> = ({ onSave, onCancel }) => {
     };
 
     const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
     ) => {
         const { name, value } = e.target;
 
@@ -154,10 +156,8 @@ const BuatRekapPO: React.FC<BuatRekapPOProps> = ({ onSave, onCancel }) => {
                 throw new Error('Failed to create PO');
             }
 
-            // Tutup loading state
             Swal.close();
 
-            // Tampilkan pesan sukses
             await Swal.fire({
                 title: 'Berhasil!',
                 text: 'Rekap PO berhasil dibuat',
@@ -170,11 +170,8 @@ const BuatRekapPO: React.FC<BuatRekapPOProps> = ({ onSave, onCancel }) => {
 
         } catch (error) {
             console.error('Error:', error);
-
-            // Tutup loading state
             Swal.close();
 
-            // Tampilkan pesan error
             await Swal.fire({
                 title: 'Error!',
                 text: 'Gagal membuat rekap PO',
@@ -288,7 +285,7 @@ const BuatRekapPO: React.FC<BuatRekapPOProps> = ({ onSave, onCancel }) => {
                             onChange={handleChange}
                             className="w-full p-2 border rounded"
                             required
-                            style={{ textTransform: 'uppercase' }}
+                            style={{textTransform: 'uppercase'}}
                         />
                     </div>
 
@@ -364,6 +361,22 @@ const BuatRekapPO: React.FC<BuatRekapPOProps> = ({ onSave, onCancel }) => {
                             className="w-full p-2 border rounded"
                             required
                         />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Progress *
+                        </label>
+                        <select
+                            name="progress"
+                            value={formData.progress}
+                            onChange={handleChange}
+                            className="w-full p-2 border rounded"
+                            required
+                        >
+                            <option value="onprogress">On Progress</option>
+                            <option value="finish">Finish</option>
+                        </select>
                     </div>
 
                     <div>

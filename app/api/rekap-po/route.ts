@@ -3,11 +3,32 @@ import { db } from '@/lib/db';
 
 export async function GET() {
     try {
-        const [rows] = await db.execute('SELECT * FROM rekap_po ORDER BY tanggal DESC');
+        console.log('Fetching rekap-po data...');
+
+        const [rows] = await db.execute(`
+            SELECT 
+                id,
+                no_po,
+                judulPO,
+                DATE_FORMAT(tanggal, '%Y-%m-%d') as tanggal,
+                CAST(status AS DECIMAL(10,2)) as status,
+                CAST(nilai_penawaran AS DECIMAL(15,2)) as nilai_penawaran,
+                CAST(nilai_po AS DECIMAL(15,2)) as nilai_po,
+                CAST(biaya_pelaksanaan AS DECIMAL(15,2)) as biaya_pelaksanaan,
+                CAST(profit AS DECIMAL(15,2)) as profit,
+                keterangan,
+                nama_perusahaan
+            FROM rekap_po 
+            ORDER BY tanggal DESC
+        `);
+
         return NextResponse.json(rows);
     } catch (error) {
         console.error('Database Error:', error);
-        return NextResponse.json({ error: 'Database Error' }, { status: 500 });
+        return NextResponse.json(
+            { error: 'Failed to fetch data' },
+            { status: 500 }
+        );
     }
 }
 
@@ -17,15 +38,15 @@ export async function POST(request: Request) {
 
         const [result] = await db.execute(
             `INSERT INTO rekap_po (
-                nama_perusahaan, 
-                no_po, 
-                judulPO, 
-                tanggal, 
-                nilai_penawaran, 
-                nilai_po, 
-                biaya_pelaksanaan, 
-                profit, 
-                status, 
+                nama_perusahaan,
+                no_po,
+                judulPO,
+                tanggal,
+                nilai_penawaran,
+                nilai_po,
+                biaya_pelaksanaan,
+                profit,
+                status,
                 keterangan
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
