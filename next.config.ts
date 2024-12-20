@@ -10,7 +10,10 @@ const nextConfig = {
                 protocol: 'https',
                 hostname: 'i.imgur.com'
             }
-        ]
+        ],
+        // Add this to handle certificate issues
+        dangerouslyAllowSVG: true,
+        unoptimized: true
     },
     typescript: {
         ignoreBuildErrors: true,
@@ -23,6 +26,7 @@ const nextConfig = {
             config.resolve.fallback = {
                 ...config.resolve.fallback,
                 fs: false,
+                canvas: false,
                 path: false,
                 stream: false,
                 crypto: false,
