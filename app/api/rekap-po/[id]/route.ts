@@ -9,52 +9,87 @@ export async function PUT(
         const id = params.id;
         const data = await request.json();
 
-        // Check if this is a progress update
-        if (data.progress) {
+        // Validate ID
+        if (!id || isNaN(Number(id))) {
+            return NextResponse.json(
+                { error: 'Invalid ID provided' },
+                { status: 400 }
+            );
+        }
+
+        // Handle progress update
+        if (data.progress !== undefined) {
+            // Validate progress value
+            if (!['onprogress', 'finish'].includes(data.progress)) {
+                return NextResponse.json(
+                    { error: 'Invalid progress value' },
+                    { status: 400 }
+                );
+            }
+
             const [result] = await db.execute(
                 'UPDATE rekap_po SET progress = ? WHERE id = ?',
                 [data.progress, id]
             );
-            return NextResponse.json({ success: true, data: result });
+
+            if ((result as any).affectedRows === 0) {
+                return NextResponse.json(
+                    { error: 'Record not found' },
+                    { status: 404 }
+                );
+            }
+
+            return NextResponse.json({
+                success: true,
+                data: { id, progress: data.progress }
+            });
         }
 
-        // If not progress update, handle the existing biaya_pelaksanaan update
-        const [result] = await db.execute(
-            `UPDATE rekap_po 
-             SET biaya_pelaksanaan = ?,
-                 profit = ?,
-                 status = ?
-             WHERE id = ?`,
-            [data.biaya_pelaksanaan, data.profit, data.status, id]
+        // Handle biaya_pelaksanaan update
+        if (data.biaya_pelaksanaan !== undefined) {
+            // Validate numeric values
+            const biaya = Number(data.biaya_pelaksanaan);
+            const profit = Number(data.profit);
+            const status = Number(data.status);
+
+            if (isNaN(biaya) || isNaN(profit) || isNaN(status)) {
+                return NextResponse.json(
+                    { error: 'Invalid numeric values provided' },
+                    { status: 400 }
+                );
+            }
+
+            const [result] = await db.execute(
+                `UPDATE rekap_po
+                 SET biaya_pelaksanaan = ?,
+                     profit = ?,
+                     status = ?
+                 WHERE id = ?`,
+                [biaya, profit, status, id]
+            );
+
+            if ((result as any).affectedRows === 0) {
+                return NextResponse.json(
+                    { error: 'Record not found' },
+                    { status: 404 }
+                );
+            }
+
+            return NextResponse.json({
+                success: true,
+                data: { id, biaya_pelaksanaan: biaya, profit, status }
+            });
+        }
+
+        return NextResponse.json(
+            { error: 'No valid update parameters provided' },
+            { status: 400 }
         );
 
-        return NextResponse.json({ success: true, data: result });
     } catch (error) {
         console.error('Database Error:', error);
         return NextResponse.json(
-            { error: 'Failed to update data' },
-            { status: 500 }
-        );
-    }
-}
-
-export async function DELETE(
-    request: Request,
-    { params }: { params: { id: string } }
-) {
-    try {
-        const id = params.id;
-
-        const [result] = await db.execute(
-            'DELETE FROM rekap_po WHERE id = ?',
-            [id]
-        );
-
-        return NextResponse.json({ success: true, data: result });
-    } catch (error) {
-        console.error('Database Error:', error);
-        return NextResponse.json(
-            { error: 'Failed to delete data' },
+            { error: 'Internal server error' },
             { status: 500 }
         );
     }

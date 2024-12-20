@@ -12,6 +12,7 @@ export async function GET() {
                 judulPO,
                 DATE_FORMAT(tanggal, '%Y-%m-%d') as tanggal,
                 CAST(status AS DECIMAL(10,2)) as status,
+                progress, /* Tambahkan kolom progress */
                 CAST(nilai_penawaran AS DECIMAL(15,2)) as nilai_penawaran,
                 CAST(nilai_po AS DECIMAL(15,2)) as nilai_po,
                 CAST(biaya_pelaksanaan AS DECIMAL(15,2)) as biaya_pelaksanaan,
@@ -21,6 +22,8 @@ export async function GET() {
             FROM rekap_po 
             ORDER BY tanggal DESC
         `);
+
+        console.log('Fetched data:', rows); // Untuk debugging
 
         return NextResponse.json(rows);
     } catch (error) {
@@ -47,8 +50,9 @@ export async function POST(request: Request) {
                 biaya_pelaksanaan,
                 profit,
                 status,
-                keterangan
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                keterangan,
+                progress /* Tambahkan kolom progress */
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'onprogress')`, /* Set default value */
             [
                 data.nama_perusahaan,
                 data.no_po,

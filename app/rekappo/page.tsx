@@ -101,6 +101,8 @@ export default function RekapPOPage() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
+            console.log('Fetched data:', data); // Tambahkan ini untuk debugging
+
             if (!Array.isArray(data)) {
                 throw new Error('Data is not in expected format');
             }
@@ -121,11 +123,13 @@ export default function RekapPOPage() {
     };
 
     const handleUpdateProgress = async (id: number, newProgress: 'onprogress' | 'finish') => {
-        if (updatingProgressId === id) return; // Prevent double submissions
+        if (updatingProgressId === id) return;
 
         setUpdatingProgressId(id);
         try {
-            const response = await fetch(`/api/rekap-po/${id}/progress`, {
+            console.log('Updating progress for ID:', id, 'New progress:', newProgress);
+
+            const response = await fetch(`/api/rekap-po/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -133,21 +137,28 @@ export default function RekapPOPage() {
                 body: JSON.stringify({ progress: newProgress }),
             });
 
+            const result = await response.json();
+            console.log('Update response:', result);
+
             if (!response.ok) {
-                throw new Error('Failed to update progress');
+                throw new Error(result.error || 'Failed to update progress');
             }
 
-            // Update the local state immediately
+            // Fetch fresh data instead of updating state directly
+            await fetchRekapPO();
+
+        } catch (error) {
+            console.error('Error updating progress:', error);
+            alert('Gagal mengupdate progress. Silakan coba lagi.');
+
+            // Revert select value to original state
             setRekapPOList(prevList =>
                 prevList.map(po =>
                     po.id === id
-                        ? { ...po, progress: newProgress }
+                        ? { ...po, progress: po.progress }
                         : po
                 )
             );
-        } catch (error) {
-            console.error('Error updating progress:', error);
-            alert('Gagal mengupdate progress');
         } finally {
             setUpdatingProgressId(null);
         }

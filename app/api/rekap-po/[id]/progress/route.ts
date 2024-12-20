@@ -7,22 +7,23 @@ export async function PUT(
 ) {
     try {
         const id = params.id;
-        const { progress } = await request.json();
+        const data = await request.json();
 
-        // Add console.log for debugging
-        console.log('Updating progress:', { id, progress });
+        // Check if this is a progress update
+        if (data.progress) {
+            // Validate that progress value matches enum
+            if (!['onprogress', 'finish'].includes(data.progress)) {
+                return NextResponse.json(
+                    { error: 'Invalid progress value. Must be either "onprogress" or "finish"' },
+                    { status: 400 }
+                );
+            }
 
-        const [result] = await db.execute(
-            'UPDATE rekap_po SET progress = ? WHERE id = ?',
-            [progress, id]
-        );
-
-        // Verify the update was successful
-        if (result.affectedRows === 0) {
-            return NextResponse.json(
-                { error: 'No record was updated' },
-                { status: 400 }
+            const [result] = await db.execute(
+                'UPDATE rekap_po SET progress = ? WHERE id = ?',
+                [data.progress, id]
             );
+            return NextResponse.json({ success: true, data: result });
         }
 
         // Add console.log for debugging
