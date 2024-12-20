@@ -1,10 +1,11 @@
 'use client';
 
-import {useState, useEffect} from 'react';
+import { useState, useEffect } from 'react';
 import BuatRekapPO from '@/components/BuatRekapPO';
 import CetakRekap from '@/components/CetakRekap';
-import type {Company} from '@/app/api/companies/route';
+import type { Company } from '@/app/api/companies/route';
 import InstruksiPanduan from '@/components/InstruksiPanduan';
+import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface RekapPO {
     id: number;
@@ -12,7 +13,7 @@ interface RekapPO {
     judulPO: string;
     tanggal: string;
     status: number;
-    progress: 'onprogress' | 'finish';  // Add this line
+    progress: 'onprogress' | 'finish';
     nilai_penawaran: number;
     nilai_po: number;
     biaya_pelaksanaan: number;
@@ -20,6 +21,15 @@ interface RekapPO {
     keterangan: string;
     nama_perusahaan: string;
 }
+
+// Type for sort direction
+type SortDirection = 'asc' | 'desc' | null;
+
+// Type for sort configuration
+type SortConfig = {
+    key: keyof RekapPO;
+    direction: SortDirection;
+};
 
 const formatRupiah = (value: number, isProfit: boolean = false): string => {
     const absoluteValue = Math.abs(value);
@@ -59,7 +69,6 @@ const getMonthName = (date: string): string => {
     return months[monthIndex];
 };
 
-
 export default function RekapPOPage() {
     const [rekapPOList, setRekapPOList] = useState<RekapPO[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -71,10 +80,14 @@ export default function RekapPOPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isCetakModalOpen, setIsCetakModalOpen] = useState(false);
-    const [showPanduan, setShowPanduan] = useState(false);  // Tambahkan state ini
+    const [showPanduan, setShowPanduan] = useState(false);
     const [editingPO, setEditingPO] = useState<RekapPO | null>(null);
     const [newBiayaPelaksanaan, setNewBiayaPelaksanaan] = useState<number>(0);
     const [updatingProgressId, setUpdatingProgressId] = useState<number | null>(null);
+    const [sortConfig, setSortConfig] = useState<SortConfig>({
+        key: 'no_po',
+        direction: null
+    });
 
     useEffect(() => {
         fetchRekapPO();
@@ -101,7 +114,6 @@ export default function RekapPOPage() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
-            console.log('Fetched data:', data); // Tambahkan ini untuk debugging
 
             if (!Array.isArray(data)) {
                 throw new Error('Data is not in expected format');
@@ -122,13 +134,28 @@ export default function RekapPOPage() {
         setIsEditModalOpen(true);
     };
 
+    const handleSort = (key: keyof RekapPO) => {
+        let direction: SortDirection = 'asc';
+        if (sortConfig.key === key) {
+            if (sortConfig.direction === 'asc') direction = 'desc';
+            else if (sortConfig.direction === 'desc') direction = null;
+            else direction = 'asc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: keyof RekapPO) => {
+        if (sortConfig.key !== key) return <ArrowUpDown className="w-4 h-4 ml-1" />;
+        if (sortConfig.direction === 'asc') return <ArrowUp className="w-4 h-4 ml-1" />;
+        if (sortConfig.direction === 'desc') return <ArrowDown className="w-4 h-4 ml-1" />;
+        return <ArrowUpDown className="w-4 h-4 ml-1" />;
+    };
+
     const handleUpdateProgress = async (id: number, newProgress: 'onprogress' | 'finish') => {
         if (updatingProgressId === id) return;
 
         setUpdatingProgressId(id);
         try {
-            console.log('Updating progress for ID:', id, 'New progress:', newProgress);
-
             const response = await fetch(`/api/rekap-po/${id}`, {
                 method: 'PUT',
                 headers: {
@@ -137,28 +164,14 @@ export default function RekapPOPage() {
                 body: JSON.stringify({ progress: newProgress }),
             });
 
-            const result = await response.json();
-            console.log('Update response:', result);
-
             if (!response.ok) {
-                throw new Error(result.error || 'Failed to update progress');
+                throw new Error('Failed to update progress');
             }
 
-            // Fetch fresh data instead of updating state directly
             await fetchRekapPO();
-
         } catch (error) {
             console.error('Error updating progress:', error);
             alert('Gagal mengupdate progress. Silakan coba lagi.');
-
-            // Revert select value to original state
-            setRekapPOList(prevList =>
-                prevList.map(po =>
-                    po.id === id
-                        ? { ...po, progress: po.progress }
-                        : po
-                )
-            );
         } finally {
             setUpdatingProgressId(null);
         }
@@ -181,7 +194,7 @@ export default function RekapPOPage() {
                 biaya_pelaksanaan: newBiayaPelaksanaan,
                 profit: profit,
                 status: status,
-                progress: editingPO.progress  // Add this line
+                progress: editingPO.progress
             };
 
             const response = await fetch(`/api/rekap-po/${editingPO.id}`, {
@@ -211,6 +224,45 @@ export default function RekapPOPage() {
         return Array.from(new Set(years)).sort((a, b) => b - a);
     };
 
+    const sortData = (data: RekapPO[]) => {
+        if (!sortConfig.direction) return data;
+
+        return [...data].sort((a, b) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            // Handle currency-related fields
+            const currencyFields = ['nilai_penawaran', 'nilai_po', 'biaya_pelaksanaan', 'profit'];
+            if (currencyFields.includes(sortConfig.key)) {
+                // Ensure we're comparing numbers for currency fields
+                aValue = Number(aValue);
+                bValue = Number(bValue);
+            } else if (sortConfig.key === 'tanggal') {
+                // Convert dates to timestamps for comparison
+                aValue = new Date(aValue).getTime();
+                bValue = new Date(bValue).getTime();
+            } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+                // Keep other numeric values as is
+            } else {
+                // Convert non-numeric, non-date values to lowercase strings
+                aValue = String(aValue).toLowerCase();
+                bValue = String(bValue).toLowerCase();
+            }
+
+            // Handle null or undefined values
+            if (aValue === null || aValue === undefined) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (bValue === null || bValue === undefined) return sortConfig.direction === 'asc' ? 1 : -1;
+
+            if (aValue < bValue) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    };
+
     const filteredRekapPOList = rekapPOList.filter(po => {
         const poDate = new Date(po.tanggal);
         const poYear = poDate.getFullYear().toString();
@@ -232,15 +284,18 @@ export default function RekapPOPage() {
                 return po.tanggal.includes(searchValue);
             case 'status':
                 return po.status.toString().includes(searchValue);
-            case 'progress':  // Add this case
+            case 'progress':
                 return po.progress.toLowerCase().includes(searchValue);
             default:
                 return true;
         }
     });
 
+    const sortedData = sortData(filteredRekapPOList);
+
     return (
         <div className="container mx-auto p-4">
+            {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">Rekap Purchase Order</h1>
                 <div className="space-x-2">
@@ -265,35 +320,7 @@ export default function RekapPOPage() {
                 </div>
             </div>
 
-            {/* Modal Panduan */}
-            {showPanduan && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center overflow-y-auto">
-                    <div className="relative bg-white rounded-lg shadow-lg max-w-4xl mx-4 my-8">
-                        <div className="absolute top-4 right-4">
-                            <button
-                                onClick={() => setShowPanduan(false)}
-                                className="text-gray-400 hover:text-gray-600 focus:outline-none"
-                            >
-                                <svg className="h-6 w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="p-6 overflow-y-auto max-h-[80vh]">
-                            <InstruksiPanduan />
-                        </div>
-                        <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
-                            <button
-                                onClick={() => setShowPanduan(false)}
-                                className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                            >
-                                Tutup Panduan
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            {/* Search and Filter Section */}
             <div className="mb-4 flex space-x-4 items-end">
                 <div className="flex-1">
                     <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -313,6 +340,7 @@ export default function RekapPOPage() {
                             <option value="judulPO">Judul PO</option>
                             <option value="tanggal">Tanggal</option>
                             <option value="status">Status</option>
+                            <option value="progress">Progress</option>
                         </select>
 
                         {searchCategory === 'perusahaan' ? (
@@ -341,7 +369,7 @@ export default function RekapPOPage() {
                 </div>
             </div>
 
-
+            {/* Year and Month Filters */}
             <div className="mb-4 space-y-4">
                 <div>
                     <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -384,7 +412,7 @@ export default function RekapPOPage() {
                 </div>
             </div>
 
-
+            {/* Table Section */}
             {isLoading ? (
                 <div className="text-center py-4">
                     <p>Loading data...</p>
@@ -394,20 +422,101 @@ export default function RekapPOPage() {
                     <table className="min-w-full bg-white">
                         <thead>
                         <tr>
-                            <th className="px-4 py-2">No PO</th>
-                            <th className="px-4 py-2">Perusahaan</th>
-                            <th className="px-4 py-2">Judul PO</th>
-                            <th className="px-4 py-2">Tanggal</th>
-                            <th className="px-4 py-2 min-w-[160px]">Progress</th>
-                            <th className="px-4 py-2">Nilai Penawaran</th>
-                            <th className="px-4 py-2">Nilai PO</th>
-                            <th className="px-4 py-2">Biaya Pelaksanaan</th>
-                            <th className="px-4 py-2">Profit</th>
-                            <th className="px-4 py-2 min-w-[200px]">Status Profit</th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('no_po')}
+                            >
+                                <div className="flex items-center">
+                                    No PO
+                                    {getSortIcon('no_po')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('nama_perusahaan')}
+                            >
+                                <div className="flex items-center">
+                                    Perusahaan
+                                    {getSortIcon('nama_perusahaan')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('judulPO')}
+                            >
+                                <div className="flex items-center">
+                                    Judul PO
+                                    {getSortIcon('judulPO')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('tanggal')}
+                            >
+                                <div className="flex items-center">
+                                    Tanggal
+                                    {getSortIcon('tanggal')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer min-w-[160px]"
+                                onClick={() => handleSort('progress')}
+                            >
+                                <div className="flex items-center">
+                                    Progress
+                                    {getSortIcon('progress')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('nilai_penawaran')}
+                            >
+                                <div className="flex items-center">
+                                    Nilai Penawaran
+                                    {getSortIcon('nilai_penawaran')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('nilai_po')}
+                            >
+                                <div className="flex items-center">
+                                    Nilai PO
+                                    {getSortIcon('nilai_po')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('biaya_pelaksanaan')}
+                            >
+                                <div className="flex items-center">
+                                    Biaya Pelaksanaan
+                                    {getSortIcon('biaya_pelaksanaan')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer"
+                                onClick={() => handleSort('profit')}
+                            >
+                                <div className="flex items-center">
+                                    Profit
+                                    {getSortIcon('profit')}
+                                </div>
+                            </th>
+                            <th
+                                className="px-4 py-2 cursor-pointer min-w-[200px]"
+                                onClick={() => handleSort('status')}
+                            >
+                                <div className="flex items-center">
+                                    Status Profit
+                                    {getSortIcon('status')}
+                                </div>
+                            </th>
                             <th className="px-4 py-2">Aksi</th>
                         </tr>
                         </thead>
-                        <tbody>{filteredRekapPOList.map((po) => (
+                        <tbody>
+                        {sortedData.map((po) => (
                             <tr key={po.id}>
                                 <td className="border px-4 py-2">{po.no_po}</td>
                                 <td className="border px-4 py-2">{po.nama_perusahaan}</td>
@@ -441,23 +550,55 @@ export default function RekapPOPage() {
                                         <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                                             <div
                                                 className={`${getStatusColor(Number(po.status))} h-4 rounded-full transition-all duration-500 shadow-inner`}
-                                                style={{width: `${Math.abs(po.status)}%`}}/>
+                                                style={{width: `${Math.abs(po.status)}%`}}
+                                            />
                                         </div>
-                                        <span
-                                            className={`text-sm font-medium min-w-[60px] ${po.status < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {Number(po.status).toFixed(2)}%
-                    </span>
+                                        <span className={`text-sm font-medium min-w-[60px] ${po.status < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {Number(po.status).toFixed(2)}%
+                                            </span>
                                     </div>
                                 </td>
                                 <td className="border px-4 py-2">
-                                    <button onClick={() => handleEdit(po)}
-                                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                                    <button
+                                        onClick={() => handleEdit(po)}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                                    >
                                         Edit Biaya
                                     </button>
                                 </td>
                             </tr>
-                        ))}</tbody>
+                        ))}
+                        </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* Modals */}
+            {showPanduan && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center overflow-y-auto">
+                    <div className="relative bg-white rounded-lg shadow-lg max-w-4xl mx-4 my-8">
+                        <div className="absolute top-4 right-4">
+                            <button
+                                onClick={() => setShowPanduan(false)}
+                                className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                            >
+                                <svg className="h-6 w-6" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto max-h-[80vh]">
+                            <InstruksiPanduan />
+                        </div>
+                        <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
+                            <button
+                                onClick={() => setShowPanduan(false)}
+                                className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                            >
+                                Tutup Panduan
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -500,12 +641,10 @@ export default function RekapPOPage() {
                                     Profit: {formatRupiah(editingPO.nilai_po - newBiayaPelaksanaan, true)}
                                 </p>
                                 <p className={`text-sm ${((editingPO.nilai_po - newBiayaPelaksanaan) / newBiayaPelaksanaan * 100) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    Status
-                                    Profit: {((editingPO.nilai_po - newBiayaPelaksanaan) / newBiayaPelaksanaan * 100).toFixed(2)}%
+                                    Status Profit: {((editingPO.nilai_po - newBiayaPelaksanaan) / newBiayaPelaksanaan * 100).toFixed(2)}%
                                 </p>
                             </div>
                         </div>
-
 
                         <div className="flex justify-end space-x-2">
                             <button
@@ -537,7 +676,7 @@ export default function RekapPOPage() {
 
             {isCetakModalOpen && (
                 <CetakRekap
-                    data={filteredRekapPOList}
+                    data={sortedData}
                     onClose={() => setIsCetakModalOpen(false)}
                     selectedYear={selectedYear}
                     selectedMonth={selectedMonth}
