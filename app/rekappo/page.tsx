@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import BuatRekapPO from '@/components/BuatRekapPO';
+import { useRouter } from "next/navigation"
 import CetakRekap from '@/components/CetakRekap';
 import type { Company } from '@/app/api/companies/route';
 import InstruksiPanduan from '@/components/InstruksiPanduan';
@@ -84,6 +85,65 @@ export default function RekapPOPage() {
     const [editingPO, setEditingPO] = useState<RekapPO | null>(null);
     const [newBiayaPelaksanaan, setNewBiayaPelaksanaan] = useState<number>(0);
     const [updatingProgressId, setUpdatingProgressId] = useState<number | null>(null);
+    const [userData, setUserData] = useState<{ role: string; username: string } | null>(null)
+    const router = useRouter()
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+
+                if (!token) {
+                    router.push('/login?redirect=/rekappo');
+                    return;
+                }
+
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch user data');
+                }
+
+                const data = await response.json();
+
+                // Validasi role
+                if (data.data.role !== 'superadmin' && data.data.role !== 'admin') {
+                    router.push('/unauthorized');
+                    return;
+                }
+
+                setUserData(data.data);
+                setIsLoading(false);
+
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                router.push('/login?redirect=/rekappo');
+            }
+        };
+
+        checkAuth();
+    }, [router]);
+
+    // Jika masih memuat atau role tidak valid, tampilkan indikator loading
+    if (isLoading || !userData) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <p className="text-xl font-semibold">Loading...</p>
+            </div>
+        );
+    }
+
+
+    // Jika role tidak sesuai, alihkan pengguna
+    if (userData.role !== 'superadmin' && userData.role !== 'admin') {
+        router.push('/unauthorized');
+        return null;
+    }
+
     const [sortConfig, setSortConfig] = useState<SortConfig>({
         key: 'no_po',
         direction: null

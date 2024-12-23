@@ -36,6 +36,7 @@ export default function StokGudangPage() {
 
                 const data = await response.json();
 
+                // Validasi role
                 if (data.data.role !== 'admingudang' && data.data.role !== 'superadmin') {
                     router.push('/unauthorized');
                     return;
@@ -52,6 +53,22 @@ export default function StokGudangPage() {
 
         checkAuth();
     }, [router]);
+
+    // Jika masih memuat atau role tidak valid, tampilkan indikator loading
+    if (isLoading || !userData) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <p className="text-xl font-semibold">Loading...</p>
+            </div>
+        );
+    }
+
+
+    // Jika role tidak sesuai, alihkan pengguna
+    if (userData.role !== 'admingudang' && userData.role !== 'superadmin') {
+        router.push('/unauthorized');
+        return null;
+    }
 
     const tabStyle = (isActive: boolean) => ({
         padding: "8px 16px",

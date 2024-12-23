@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Protected routes configuration
-const PROTECTED_ROUTES = ['/dashboard', '/profile', '/settings', '/admin', '/registerfacerecognition', '/stokgudang'];
+const PROTECTED_ROUTES = ['/dashboard', '/profile', '/settings', '/admin', '/registerfacerecognition', '/stokgudang', 'rekappo'];
 const PUBLIC_ROUTES = ['/login', '/register'];
 const PUBLIC_API_ROUTES = [
     '/api/login',
@@ -229,6 +229,7 @@ export const config = {
         '/registerfacerecognition',
         '/login',
         '/register',
-        '/stokgudang'
+        '/stokgudang',
+        '/rekappo'
     ]
 };
