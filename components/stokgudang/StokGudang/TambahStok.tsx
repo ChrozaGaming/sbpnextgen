@@ -185,39 +185,56 @@ const TambahStok: React.FC<TambahStokProps> = ({ onSuccess }) => {
         }
     };
 
+    const validateForm = () => {
+        if (!formData.kategori) return "Kategori harus dipilih";
+        if (!formData.sub_kategori_id) return "Sub Kategori harus dipilih";
+        if (!formData.stok_masuk || parseInt(formData.stok_masuk) <= 0) return "Stok masuk harus lebih dari 0";
+        if (!formData.lokasi) return "Lokasi harus diisi";
+        if (!formData.tanggal_masuk) return "Tanggal masuk harus diisi";
+        if (!formData.keterangan) return "Keterangan harus dipilih";
+        return null;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        try {
-            const dataToSend = {
-                kode: formData.kode,
-                nama: formData.nama,
-                kategori: formData.kategori === '1' ? 'material' :
-                    formData.kategori === '2' ? 'alat' : 'consumable',
-                sub_kategori_id: parseInt(formData.sub_kategori_id),
-                stok_masuk: parseInt(formData.stok_masuk),
-                satuan: formData.satuan,
-                lokasi: formData.lokasi,
-                tanggal_masuk: formData.tanggal_masuk,
-                keterangan: formData.keterangan || null
-            };
+        // Create the data object to send
+        const dataToSend = {
+            kode: formData.kode,
+            nama: formData.nama,
+            kategori: formData.kategori === '1' ? 'material' :
+                formData.kategori === '2' ? 'alat' : 'consumable',
+            sub_kategori_id: parseInt(formData.sub_kategori_id),
+            stok_masuk: parseInt(formData.stok_masuk),
+            satuan: formData.satuan,
+            lokasi: formData.lokasi,
+            tanggal_entry: new Date().toISOString(), // Add this
+            tanggal_masuk: formData.tanggal_masuk,
+            keterangan: formData.keterangan || null
+        };
 
+        console.log('Sending data:', dataToSend); // Debug log
+
+        try {
             const response = await fetch('/api/stok', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify(dataToSend),
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-
             if (data.success) {
                 onSuccess?.();
+                // Reset form
                 setFormData({
                     kode: '',
                     nama: '',
@@ -230,16 +247,15 @@ const TambahStok: React.FC<TambahStokProps> = ({ onSuccess }) => {
                     tanggal_masuk: dayjs().format('YYYY-MM-DD'),
                     keterangan: ''
                 });
-            } else {
-                throw new Error(data.message || 'Failed to add stock');
             }
         } catch (error) {
-            console.error('Error adding stock:', error);
+            console.error('Error submitting form:', error);
             setError(error instanceof Error ? error.message : 'Failed to add stock');
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200 max-w-7xl mx-auto my-8">
@@ -247,10 +263,10 @@ const TambahStok: React.FC<TambahStokProps> = ({ onSuccess }) => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
-                    <div className="bg-red-50 border-l-4 border-red-500 p-5 rounded-md mb-6">
+                    <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
                         <div className="flex">
                             <div className="flex-shrink-0">
-                                <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                 </svg>
                             </div>
@@ -260,6 +276,7 @@ const TambahStok: React.FC<TambahStokProps> = ({ onSuccess }) => {
                         </div>
                     </div>
                 )}
+
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-2">
                     <div className="space-y-2">
@@ -401,6 +418,39 @@ const TambahStok: React.FC<TambahStokProps> = ({ onSuccess }) => {
                                 Maaf, fitur ini akan segera hadir!
                             </p>
                         )}
+                    </div>
+                </div>
+
+                {/* Pernyataan Persetujuan */}
+                <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="ml-3">
+                            <h3 className="text-sm font-bold text-yellow-800 uppercase mb-2">
+                                PERNYATAAN TANGGUNG JAWAB
+                            </h3>
+                            <div className="text-sm text-yellow-700 font-medium space-y-2">
+                                <p>
+                                    Dengan ini saya menyatakan:
+                                </p>
+                                <p className="font-bold">
+                                    "SAYA BERSUNGGUH-SUNGGUH MENGISI DATA DENGAN VALID DAN BENAR! DATA TIDAK DAPAT DIEDIT ATAU DIHAPUS KECUALI DENGAN ADANYA PERSETUJUAN SISTEM ADMINISTRASI."
+                                </p>
+                                <p>
+                                    Saya menyadari sepenuhnya bahwa:
+                                </p>
+                                <ul className="list-disc ml-5 space-y-1">
+                                    <li>Data yang dimasukkan bersifat permanen dan tidak dapat diubah tanpa persetujuan sistem administrasi</li>
+                                    <li>Saya bertanggung jawab penuh atas kebenaran data yang diinput</li>
+                                    <li>Saya bersedia menerima sanksi sesuai kebijakan perusahaan jika terbukti memasukkan data yang tidak valid</li>
+                                    <li>Tindakan ini tunduk pada peraturan dan kebijakan Hukum PT SINAR BUANA PRIMA</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

@@ -103,6 +103,7 @@ export default function RekapPOPage() {
         } catch (error) {
             console.error('Error fetching companies:', error);
             setCompanies([]);
+            window.location.href = '/login';
         }
     };
 
@@ -121,8 +122,8 @@ export default function RekapPOPage() {
             setRekapPOList(data);
         } catch (error) {
             console.error('Error fetching data:', error);
-            alert('Gagal mengambil data. Silakan coba lagi.');
             setRekapPOList([]);
+            window.location.href = '/login';
         } finally {
             setIsLoading(false);
         }

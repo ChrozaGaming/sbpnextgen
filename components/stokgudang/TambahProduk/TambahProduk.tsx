@@ -29,10 +29,16 @@ interface SatuanOption {
     label: string;
 }
 
+interface MessageState {
+    type: string;
+    content: string;
+}
+
 const TambahProduk = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState({ type: '', content: '' });
+    const [showModal, setShowModal] = useState(false);
+    const [message, setMessage] = useState<MessageState>({ type: '', content: '' });
     const [formState, setFormState] = useState<FormState>({
         kategori_id: '',
         kode_item: '',
@@ -105,10 +111,13 @@ const TambahProduk = () => {
         }));
     };
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        setLoading(true);
+        setShowModal(true);
+    };
 
+    const handleConfirmSubmit = async () => {
+        setLoading(true);
         try {
             const data = {
                 ...formState,
@@ -146,157 +155,234 @@ const TambahProduk = () => {
             });
         } finally {
             setLoading(false);
+            setShowModal(false);
             setTimeout(() => setMessage({ type: '', content: '' }), 3000);
         }
     };
 
     return (
-        <div className="max-w-2xl mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-6">Tambahkan Produk</h1>
+        <>
+            <div className="max-w-2xl mx-auto p-6">
+                <h1 className="text-2xl font-bold mb-6">Tambahkan Produk</h1>
 
-            {message.content && (
-                <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {message.content}
+                {message.content && (
+                    <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {message.content}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md space-y-4">
+                    <div>
+                        <label htmlFor="kategori_id" className="block text-sm font-medium text-gray-700 mb-1">
+                            Kategori
+                        </label>
+                        <select
+                            id="kategori_id"
+                            name="kategori_id"
+                            value={formState.kategori_id}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">Pilih Kategori</option>
+                            {kategoriOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label htmlFor="kode_item" className="block text-sm font-medium text-gray-700 mb-1">
+                            Kode Item (Huruf Kapital)
+                        </label>
+                        <input
+                            type="text"
+                            id="kode_item"
+                            name="kode_item"
+                            value={formState.kode_item}
+                            onChange={handleInputChange}
+                            required
+                            maxLength={20}
+                            placeholder="Contoh: MAT-001"
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            style={{ textTransform: 'uppercase' }}
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="nama" className="block text-sm font-medium text-gray-700 mb-1">
+                            Nama (Kapital Setiap Kata)
+                        </label>
+                        <input
+                            type="text"
+                            id="nama"
+                            name="nama"
+                            value={formState.nama}
+                            onChange={handleInputChange}
+                            required
+                            maxLength={100}
+                            placeholder={`Masukkan Nama ${getCurrentCategoryName()}`}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">
+                            Brand (Kapital Setiap Kata)
+                        </label>
+                        <input
+                            type="text"
+                            id="brand"
+                            name="brand"
+                            value={formState.brand}
+                            onChange={handleInputChange}
+                            maxLength={100}
+                            placeholder="Masukkan Brand"
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="satuan" className="block text-sm font-medium text-gray-700 mb-1">
+                            Satuan
+                        </label>
+                        <select
+                            id="satuan"
+                            name="satuan"
+                            value={formState.satuan}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">Pilih Satuan</option>
+                            {satuanOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                            Status
+                        </label>
+                        <select
+                            id="status"
+                            name="status"
+                            value={formState.status}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            {statusOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label htmlFor="keterangan" className="block text-sm font-medium text-gray-700 mb-1">
+                            Keterangan
+                        </label>
+                        <textarea
+                            id="keterangan"
+                            name="keterangan"
+                            value={formState.keterangan}
+                            onChange={handleInputChange}
+                            rows={4}
+                            placeholder="Masukkan keterangan (opsional)"
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className={`w-full py-2 px-4 rounded-md text-white font-medium ${
+                            loading
+                                ? 'bg-blue-400 cursor-not-allowed'
+                                : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                        }`}
+                    >
+                        {loading ? 'Menyimpan...' : 'Simpan Sub Kategori'}
+                    </button>
+                </form>
+            </div>
+
+            {/* Modal Konfirmasi */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg max-w-3xl max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="space-y-4">
+                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                                    <div className="text-sm text-yellow-800">
+                                        <div className="flex items-center mb-4">
+                                            <svg className="h-6 w-6 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                            </svg>
+                                            <span className="font-bold text-lg">PERHATIAN!</span>
+                                        </div>
+
+                                        <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500">
+                                            <div className="font-bold text-red-700 text-center space-y-1">
+                                                <p>"SAYA BERSUNGGUH-SUNGGUH MENGISI DATA</p>
+                                                <p>DENGAN VALID DAN BENAR,</p>
+                                                <p>DAN DAPAT DIPERTANGGUNGJAWABKAN SELURUHNYA!"</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-3">
+                                            <p className="font-semibold mb-2">Detail Data yang akan disimpan:</p>
+                                            <ul className="list-disc ml-5 space-y-1 text-gray-700">
+                                                <li>Kategori: {kategoriOptions.find(opt => opt.value === Number(formState.kategori_id))?.label}</li>
+                                                <li>Kode Item: {formState.kode_item}</li>
+                                                <li>Nama: {formState.nama}</li>
+                                                <li>Brand: {formState.brand || '-'}</li>
+                                                <li>Satuan: {satuanOptions.find(opt => opt.value === formState.satuan)?.label}</li>
+                                                <li>Status: {statusOptions.find(opt => opt.value === formState.status)?.label}</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="border-t border-yellow-300 pt-3">
+                                            <p className="font-semibold mb-2">Dengan menekan tombol SETUJU & SIMPAN, Saya menyatakan bahwa:</p>
+                                            <ul className="list-disc ml-5 space-y-1 text-red-600 font-medium">
+                                                <li>Data yang dimasukkan sudah VALID dan BENAR</li>
+                                                <li>Data TIDAK DAPAT DIEDIT atau DIHAPUS tanpa persetujuan Sistem Administrasi</li>
+                                                <li>Saya BERTANGGUNG JAWAB PENUH atas kebenaran data</li>
+                                                <li>Saya SIAP MENERIMA SANKSI sesuai kebijakan PT SINAR BUANA PRIMA</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex justify-end space-x-4">
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-medium"
+                                    style={{ width: '100px' }}
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleConfirmSubmit}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+                                    style={{ width: '150px' }}
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Menyimpan...' : 'SETUJU & SIMPAN'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
-
-            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md space-y-4">
-                <div>
-                    <label htmlFor="kategori_id" className="block text-sm font-medium text-gray-700 mb-1">
-                        Kategori
-                    </label>
-                    <select
-                        id="kategori_id"
-                        name="kategori_id"
-                        value={formState.kategori_id}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="">Pilih Kategori</option>
-                        {kategoriOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label htmlFor="kode_item" className="block text-sm font-medium text-gray-700 mb-1">
-                        Kode Item (Huruf Kapital)
-                    </label>
-                    <input
-                        type="text"
-                        id="kode_item"
-                        name="kode_item"
-                        value={formState.kode_item}
-                        onChange={handleInputChange}
-                        required
-                        maxLength={20}
-                        placeholder="Contoh: MAT-001"
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        style={{ textTransform: 'uppercase' }}
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="nama" className="block text-sm font-medium text-gray-700 mb-1">
-                        Nama (Kapital Setiap Kata)
-                    </label>
-                    <input
-                        type="text"
-                        id="nama"
-                        name="nama"
-                        value={formState.nama}
-                        onChange={handleInputChange}
-                        required
-                        maxLength={100}
-                        placeholder={`Masukkan Nama ${getCurrentCategoryName()}`}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">
-                        Brand (Kapital Setiap Kata)
-                    </label>
-                    <input
-                        type="text"
-                        id="brand"
-                        name="brand"
-                        value={formState.brand}
-                        onChange={handleInputChange}
-                        maxLength={100}
-                        placeholder="Masukkan Brand"
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="satuan" className="block text-sm font-medium text-gray-700 mb-1">
-                        Satuan
-                    </label>
-                    <select
-                        id="satuan"
-                        name="satuan"
-                        value={formState.satuan}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="">Pilih Satuan</option>
-                        {satuanOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-                        Status
-                    </label>
-                    <select
-                        id="status"
-                        name="status"
-                        value={formState.status}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        {statusOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label htmlFor="keterangan" className="block text-sm font-medium text-gray-700 mb-1">
-                        Keterangan
-                    </label>
-                    <textarea
-                        id="keterangan"
-                        name="keterangan"
-                        value={formState.keterangan}
-                        onChange={handleInputChange}
-                        rows={4}
-                        placeholder="Masukkan keterangan (opsional)"
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    />
-                </div>
-
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className={`w-full py-2 px-4 rounded-md text-white font-medium ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'}`}
-                >
-                    {loading ? 'Menyimpan...' : 'Simpan Sub Kategori'}
-                </button>
-            </form>
-        </div>
+        </>
     );
 };
 

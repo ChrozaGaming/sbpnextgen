@@ -4,7 +4,7 @@
 import { useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaBars, FaTimes } from 'react-icons/fa';
+import { FaBars, FaTimes, FaWarehouse } from 'react-icons/fa';
 import { BiScan } from 'react-icons/bi'; // Import icon untuk Register Face
 import styles from './Sidebar.module.css';
 import { usePathname } from 'next/navigation';
@@ -64,10 +64,19 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                     </li>
                     <li>
                         <Link
+                            href="/stokgudang"
+                            className={`${styles.menuItem} ${pathname === '/stokgudang' ? styles.active : ''}`}
+                        >
+                            <FaWarehouse className="text-xl"/>
+                            <span> Stok Gudang</span>
+                        </Link>
+                    </li>
+                    <li>
+                        <Link
                             href="/registerfacerecognition"
                             className={`${styles.menuItem} ${pathname === '/registerfacerecognition' ? styles.active : ''}`}
                         >
-                            <BiScan className="text-xl" />
+                            <BiScan className="text-xl"/>
                             <span className="flex items-center">
                                 Register Face
                                 {!user?.hasFaceRegistration && (

@@ -156,26 +156,26 @@ export default function DataStokMasuk() {
                         </div>
 
                         <div className="flex gap-2">
-                            <button
-                                onClick={() => setShowTambahForm(true)}
-                                className="px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"
-                            >
-                                <svg
-                                    className="h-5 w-5"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M12 4v16m8-8H4"
-                                    />
-                                </svg>
-                                Tambah Stok
-                            </button>
+                            {/*<button*/}
+                            {/*    onClick={() => setShowTambahForm(true)}*/}
+                            {/*    className="px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"*/}
+                            {/*>*/}
+                            {/*    <svg*/}
+                            {/*        className="h-5 w-5"*/}
+                            {/*        xmlns="http://www.w3.org/2000/svg"*/}
+                            {/*        fill="none"*/}
+                            {/*        viewBox="0 0 24 24"*/}
+                            {/*        stroke="currentColor"*/}
+                            {/*    >*/}
+                            {/*        <path*/}
+                            {/*            strokeLinecap="round"*/}
+                            {/*            strokeLinejoin="round"*/}
+                            {/*            strokeWidth={2}*/}
+                            {/*            d="M12 4v16m8-8H4"*/}
+                            {/*        />*/}
+                            {/*    </svg>*/}
+                            {/*    Tambah Stok*/}
+                            {/*</button>*/}
 
                             <button
                                 onClick={fetchData}

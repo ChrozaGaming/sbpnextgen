@@ -144,40 +144,99 @@ const TambahStokMasuk = () => {
     };
 
     const onFinish = async (values: StokMasukForm) => {
-        try {
-            setLoading(true);
+        Modal.confirm({
+            title: 'Konfirmasi Penambahan Stok',
+            content: (
+                <div className="space-y-4">
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 my-4">
+                        <div className="text-sm text-yellow-800">
+                            <div className="flex items-center mb-4">
+                                <svg className="h-6 w-6 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span className="font-bold text-lg">PERHATIAN!</span>
+                            </div>
 
-            const stokData = {
-                ...values,
-                tanggal_entry: dayjs().format('YYYY-MM-DD'),
-                tanggal_masuk: dayjs(values.tanggal_masuk).format('YYYY-MM-DD'),
-                stok_sisa: values.stok_masuk,
-                stok_keluar: 0
-            };
+                            <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500">
+                                <p className="font-bold text-red-700 text-center">
+                                    "SAYA BERSUNGGUH-SUNGGUH MENGISI DATA DENGAN VALID DAN BENAR!"
+                                </p>
+                            </div>
 
-            const response = await fetch('/api/stokgudang/stok-masuk', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(stokData)
-            });
+                            <div className="mb-3">
+                                <p className="font-semibold mb-2">Detail Data yang akan disimpan:</p>
+                                <ul className="list-disc ml-5 space-y-1 text-gray-700">
+                                    <li>Kategori: {values.kategori}</li>
+                                    <li>Kode: {values.kode}</li>
+                                    <li>Jumlah Stok: {values.stok_masuk} {values.satuan}</li>
+                                    <li>Tanggal Masuk: {dayjs(values.tanggal_masuk).format('DD/MM/YYYY')}</li>
+                                </ul>
+                            </div>
 
-            if (!response.ok) throw new Error('Network response was not ok');
-            const result = await response.json();
+                            <div className="border-t border-yellow-300 pt-3">
+                                <p className="font-semibold mb-2">Dengan menekan tombol SETUJU, Saya menyatakan bahwa:</p>
+                                <ul className="list-disc ml-5 space-y-1 text-red-600 font-medium">
+                                    <li>Data yang dimasukkan sudah VALID dan BENAR</li>
+                                    <li>Data TIDAK DAPAT DIEDIT atau DIHAPUS tanpa persetujuan sistem administrasi</li>
+                                    <li>Saya BERTANGGUNG JAWAB PENUH atas kebenaran data</li>
+                                    <li>Saya SIAP MENERIMA SANKSI sesuai kebijakan PT SINAR BUANA PRIMA</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ),
+            okText: 'SETUJU & SIMPAN',
+            cancelText: 'Batal',
+            okButtonProps: {
+                className: 'bg-blue-600 hover:bg-blue-700',
+                style: { width: 150 }
+            },
+            cancelButtonProps: {
+                style: { width: 100 }
+            },
+            width: 680,
+            icon: null,
+            onOk: async () => {
+                try {
+                    setLoading(true);
 
-            if (result.success) {
-                message.success('Stok berhasil ditambahkan');
-                form.resetFields();
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            message.error('Gagal menambahkan stok');
-        } finally {
-            setLoading(false);
-        }
+                    const stokData = {
+                        ...values,
+                        tanggal_entry: dayjs().format('YYYY-MM-DD'),
+                        tanggal_masuk: dayjs(values.tanggal_masuk).format('YYYY-MM-DD'),
+                        stok_sisa: values.stok_masuk,
+                        stok_keluar: 0
+                    };
+
+                    const response = await fetch('/api/stokgudang/stok-masuk', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(stokData)
+                    });
+
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const result = await response.json();
+
+                    if (result.success) {
+                        message.success('Stok berhasil ditambahkan');
+                        form.resetFields();
+                    } else {
+                        throw new Error(result.message);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    message.error('Gagal menambahkan stok');
+                } finally {
+                    setLoading(false);
+                }
+            },
+            onCancel() {
+                message.info('Penambahan stok dibatalkan');
+            },
+        });
     };
 
     return (

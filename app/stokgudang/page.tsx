@@ -5,9 +5,10 @@ import DataStokMasuk from "@/components/stokgudang/StokMasuk/DataStokMasuk"
 import DataStokKeluar from "@/components/stokgudang/StokKeluar/DataStokKeluar"
 import StokGudang from "@/components/stokgudang/StokGudang/StokGudang"
 import TambahProduk from "@/components/stokgudang/TambahProduk/TambahProduk"
+import SubKategoriList from "@/components/stokgudang/SubKategoriMaterial/SubKategoriList"
 
 export default function StokGudangPage() {
-    const [activeTab, setActiveTab] = useState<'all' | 'masuk' | 'keluar' | 'tambah'>('all')
+    const [activeTab, setActiveTab] = useState<'all' | 'masuk' | 'keluar' | 'tambah' | 'subkategori'>('all')
 
     const tabStyle = (isActive: boolean) => ({
         padding: "8px 16px",
@@ -29,7 +30,8 @@ export default function StokGudangPage() {
                 borderBottom: "1px solid #ccc",
                 marginBottom: "24px",
                 display: "flex",
-                gap: "8px"
+                gap: "8px",
+                flexWrap: "wrap" // Added for better mobile responsiveness
             }}>
                 <button
                     onClick={() => setActiveTab('all')}
@@ -55,6 +57,12 @@ export default function StokGudangPage() {
                 >
                     Tambah Produk
                 </button>
+                <button
+                    onClick={() => setActiveTab('subkategori')}
+                    style={tabStyle(activeTab === 'subkategori')}
+                >
+                    Daftar Produk
+                </button>
             </div>
 
             <div>
@@ -62,6 +70,7 @@ export default function StokGudangPage() {
                 {activeTab === 'masuk' && <DataStokMasuk />}
                 {activeTab === 'keluar' && <DataStokKeluar />}
                 {activeTab === 'tambah' && <TambahProduk />}
+                {activeTab === 'subkategori' && <SubKategoriList />}
             </div>
         </div>
     )
