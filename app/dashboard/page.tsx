@@ -7,6 +7,7 @@ interface User {
     id: number;
     username: string;
     email: string;
+    role?: string;
 }
 
 export default function Dashboard() {
@@ -15,37 +16,57 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const checkAuth = async () => {
-            console.log('Checking authentication...'); // Debug log
+    // Fungsi untuk membersihkan semua data autentikasi
+    const clearAuthDataAndRedirect = () => {
+        try {
+            // Hapus localStorage items
+            localStorage.clear();
 
-            const token = localStorage.getItem('token');
-            console.log('Token found:', !!token); // Debug log (jangan tampilkan token lengkap)
-
-            if (!token) {
-                console.log('No token found, redirecting to login...'); // Debug log
-                router.replace('/login');
-                return;
+            // Hapus semua cookies
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const cookieName = cookie.split('=')[0].trim();
+                // Hapus cookie untuk berbagai kemungkinan domain dan path
+                document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
+                document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname};`;
+                document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.${window.location.hostname};`;
+                document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}; secure; samesite=strict;`;
             }
 
+            // Clear sessionStorage juga untuk berjaga-jaga
+            sessionStorage.clear();
+
+            // Redirect ke login setelah delay singkat
+            setTimeout(() => {
+                router.replace('/login');
+            }, 100);
+        } catch (error) {
+            console.error('Error clearing auth data:', error);
+            // Fallback: force reload ke login page
+            window.location.href = '/login';
+        }
+    };
+
+    useEffect(() => {
+        const checkAuth = async () => {
             try {
-                console.log('Fetching user data...'); // Debug log
+                const token = localStorage.getItem('token');
+
+                if (!token) {
+                    console.log('No token found');
+                    clearAuthDataAndRedirect();
+                    return;
+                }
+
                 const response = await fetch('/api/user', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
 
-                console.log('Response status:', response.status); // Debug log
-
-                // Log response headers untuk debugging
-                const headers = Object.fromEntries(response.headers.entries());
-                console.log('Response headers:', headers);
-
                 if (response.status === 401 || response.status === 403) {
-                    console.log('Authentication failed, redirecting to login...'); // Debug log
-                    localStorage.removeItem('token');
-                    router.replace('/login');
+                    console.log('Authentication failed');
+                    clearAuthDataAndRedirect();
                     return;
                 }
 
@@ -53,20 +74,27 @@ export default function Dashboard() {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const userData = await response.json();
-                console.log('User data received:', userData); // Debug log
+                const responseData = await response.json();
 
-                if (!userData || !userData.id) {
-                    throw new Error('Invalid user data received');
+                if (responseData.success && responseData.data) {
+                    const userData = responseData.data;
+                    if (userData && userData.id && userData.username && userData.email) {
+                        setUser(userData);
+                        setError(null);
+                    } else {
+                        throw new Error('Incomplete user data');
+                    }
+                } else if (responseData.id && responseData.username && responseData.email) {
+                    setUser(responseData);
+                    setError(null);
+                } else {
+                    throw new Error('Invalid response format');
                 }
 
-                setUser(userData);
-                setError(null);
             } catch (error) {
-                console.error('Error during authentication:', error);
+                console.error('Authentication error:', error);
                 setError(error instanceof Error ? error.message : 'An unknown error occurred');
-                localStorage.removeItem('token');
-                router.replace('/login');
+                clearAuthDataAndRedirect();
             } finally {
                 setLoading(false);
             }
@@ -75,19 +103,12 @@ export default function Dashboard() {
         checkAuth();
     }, [router]);
 
-    const handleLogout = () => {
-        console.log('Logging out...'); // Debug log
-        localStorage.removeItem('token');
-        router.replace('/login');
-    };
-
-    // Loading state
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
                     <div className="loader mb-4"></div>
-                    <p className="text-gray-600">Loading...</p>
+                    <p className="text-gray-600">Memuat data...</p>
                     <style jsx>{`
                         .loader {
                             border: 4px solid rgba(0, 0, 0, 0.1);
@@ -99,9 +120,7 @@ export default function Dashboard() {
                             margin: 0 auto;
                         }
                         @keyframes spin {
-                            to {
-                                transform: rotate(360deg);
-                            }
+                            to { transform: rotate(360deg); }
                         }
                     `}</style>
                 </div>
@@ -109,35 +128,32 @@ export default function Dashboard() {
         );
     }
 
-    // Error state
-    if (error) {
+    if (error || !user) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                    <p className="text-red-600 font-semibold mb-4">Error: {error}</p>
-                    <button
-                        onClick={() => router.replace('/login')}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                    >
-                        Return to Login
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    // No user state
-    if (!user) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <p className="text-xl font-semibold mb-4">User tidak ditemukan</p>
-                    <button
-                        onClick={() => router.replace('/login')}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                    >
-                        Login Kembali
-                    </button>
+                    <div className="mb-4">
+                        <svg
+                            className="mx-auto h-12 w-12 text-red-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                        Sesi Anda telah berakhir
+                    </h2>
+                    <p className="text-gray-600 mb-4">
+                        Anda akan dialihkan ke halaman login dalam beberapa detik...
+                    </p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
                 </div>
             </div>
         );

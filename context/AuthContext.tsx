@@ -1,4 +1,3 @@
-// context/AuthContext.tsx
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
@@ -8,13 +7,15 @@ interface User {
     id: number;
     username: string;
     email: string;
+    role: string;  // Tambahkan role
 }
 
 interface AuthContextType {
     isAuthenticated: boolean;
     user: User | null;
-    login: (token: string, userData: { userId: number; username: string; email: string }) => Promise<void>;
+    login: (token: string, userData: { userId: number; username: string; email: string; role: string }) => Promise<void>;
     logout: () => void;
+    checkRole: (allowedRoles: string[]) => boolean;  // Tambahkan fungsi checkRole
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,14 +23,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [user, setUser] = useState<User | null>(null);
-    const router = useRouter(); // Pastikan ini ada di dalam component
+    const router = useRouter();
 
-    const login = async (token: string, userData: { userId: number; username: string; email: string }) => {
+    const login = async (token: string, userData: { userId: number; username: string; email: string; role: string }) => {
         try {
             const userObj: User = {
                 id: userData.userId,
                 username: userData.username,
-                email: userData.email
+                email: userData.email,
+                role: userData.role  // Tambahkan role
             };
 
             localStorage.setItem('token', token);
@@ -44,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Pastikan menggunakan router yang sudah didefinisikan
     const logout = () => {
         try {
             localStorage.removeItem('token');
@@ -54,10 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(null);
             setIsAuthenticated(false);
 
-            router.push('/login'); // Menggunakan router yang sudah didefinisikan
+            router.push('/login');
         } catch (error) {
             console.error('Logout error:', error);
         }
+    };
+
+    // Tambahkan fungsi checkRole
+    const checkRole = (allowedRoles: string[]): boolean => {
+        if (!user) return false;
+        return allowedRoles.includes(user.role) || user.role === 'superadmin';
     };
 
     useEffect(() => {
@@ -74,14 +81,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Auth check error:', error);
             logout();
         }
-        // Tambahkan router ke dependency array jika menggunakan router di dalam useEffect
     }, []);
 
     const contextValue = {
         isAuthenticated,
         user,
         login,
-        logout
+        logout,
+        checkRole  // Tambahkan ke context value
     };
 
     return (

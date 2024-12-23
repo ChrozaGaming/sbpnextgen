@@ -91,15 +91,6 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
 
                 <div className={styles.profile}>
                     <div className={styles.profileInfo}>
-                        <div className={styles.avatarContainer}>
-                            <Image
-                                src="https://i.imgur.com/Uwz2z47.png"
-                                alt="Profile"
-                                width={40}
-                                height={40}
-                                className={styles.avatar}
-                            />
-                        </div>
                         <div>
                             <p className="font-semibold">{user?.username}</p>
                             <span className="text-sm text-gray-300">{user?.email}</span>

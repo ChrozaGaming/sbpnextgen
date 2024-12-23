@@ -4,7 +4,6 @@ import { db } from '@/lib/db';
 
 export async function GET(request: Request) {
     try {
-        // Ambil token dari header
         const authHeader = request.headers.get('authorization');
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -14,7 +13,6 @@ export async function GET(request: Request) {
             );
         }
 
-        // Ekstrak token
         const token = authHeader.split(' ')[1];
 
         if (!token) {
@@ -24,7 +22,6 @@ export async function GET(request: Request) {
             );
         }
 
-        // Decode token (format: base64 dari `${user.id}:${user.email}`)
         const decoded = Buffer.from(token, 'base64').toString('utf-8');
         const [userId, userEmail] = decoded.split(':');
 
@@ -35,9 +32,9 @@ export async function GET(request: Request) {
             );
         }
 
-        // Query database untuk mendapatkan data user
+        // Update query untuk mengambil role
         const [rows] = await db.execute(
-            'SELECT id, username, email FROM users WHERE id = ? AND email = ?',
+            'SELECT id, username, email, role FROM users WHERE id = ? AND email = ?',
             [userId, userEmail]
         ) as any[];
 
@@ -50,11 +47,15 @@ export async function GET(request: Request) {
             );
         }
 
-        // Kembalikan data user (tanpa password)
+        // Kembalikan data user termasuk role
         return NextResponse.json({
-            id: user.id,
-            username: user.username,
-            email: user.email
+            success: true,
+            data: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role
+            }
         });
 
     } catch (error) {
