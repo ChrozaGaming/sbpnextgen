@@ -85,9 +85,13 @@ export default function RekapPOPage() {
     const [editingPO, setEditingPO] = useState<RekapPO | null>(null);
     const [newBiayaPelaksanaan, setNewBiayaPelaksanaan] = useState<number>(0);
     const [updatingProgressId, setUpdatingProgressId] = useState<number | null>(null);
-    const [userData, setUserData] = useState<{ role: string; username: string } | null>(null)
-    const router = useRouter()
+    const [userData, setUserData] = useState<{ role: string; username: string } | null>(null);
+    const [countdown, setCountdown] = useState(3); // State untuk countdown 3 detik
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'no_po', direction: null });
 
+    const router = useRouter();
+
+    // Check authentication and fetch user data
     useEffect(() => {
         const checkAuth = async () => {
             try {
@@ -100,8 +104,8 @@ export default function RekapPOPage() {
 
                 const response = await fetch('/api/user', {
                     headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                        Authorization: `Bearer ${token}`,
+                    },
                 });
 
                 if (!response.ok) {
@@ -110,15 +114,8 @@ export default function RekapPOPage() {
 
                 const data = await response.json();
 
-                // Validasi role
-                if (data.data.role !== 'superadmin' && data.data.role !== 'admin') {
-                    router.push('/unauthorized');
-                    return;
-                }
-
                 setUserData(data.data);
                 setIsLoading(false);
-
             } catch (error) {
                 console.error('Auth check failed:', error);
                 router.push('/login?redirect=/rekappo');
@@ -128,31 +125,31 @@ export default function RekapPOPage() {
         checkAuth();
     }, [router]);
 
-    // Jika masih memuat atau role tidak valid, tampilkan indikator loading
-    if (isLoading || !userData) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <p className="text-xl font-semibold">Loading...</p>
-            </div>
-        );
-    }
-
-
-    // Jika role tidak sesuai, alihkan pengguna
-    if (userData.role !== 'superadmin' && userData.role !== 'admin') {
-        router.push('/unauthorized');
-        return null;
-    }
-
-    const [sortConfig, setSortConfig] = useState<SortConfig>({
-        key: 'no_po',
-        direction: null
-    });
-
+    // Countdown logic
     useEffect(() => {
-        fetchRekapPO();
-        fetchCompanies();
-    }, []);
+        if (isLoading) {
+            const timer = setInterval(() => {
+                setCountdown((prev) => (prev > 1 ? prev - 1 : 0));
+            }, 1000);
+
+            return () => clearInterval(timer);
+        }
+    }, [isLoading]);
+
+    // Role validation
+    useEffect(() => {
+        if (userData?.role && userData.role !== 'superadmin' && userData.role !== 'admin') {
+            router.push('/unauthorized');
+        }
+    }, [userData, router]);
+
+    // Fetch RekapPO and Companies
+    useEffect(() => {
+        if (!isLoading) {
+            fetchRekapPO();
+            fetchCompanies();
+        }
+    }, [isLoading]);
 
     const fetchCompanies = async () => {
         try {
@@ -163,7 +160,7 @@ export default function RekapPOPage() {
         } catch (error) {
             console.error('Error fetching companies:', error);
             setCompanies([]);
-            window.location.href = '/login';
+            router.push('/login');
         }
     };
 
@@ -183,11 +180,26 @@ export default function RekapPOPage() {
         } catch (error) {
             console.error('Error fetching data:', error);
             setRekapPOList([]);
-            window.location.href = '/login';
+            router.push('/login');
         } finally {
             setIsLoading(false);
         }
     };
+
+    // Jika masih memuat atau countdown belum selesai, tampilkan indikator loading
+    if (isLoading || countdown > 0) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <p className="text-xl font-semibold">
+                    {countdown > 0
+                        ? `Loading dalam ${countdown} detik...`
+                        : 'Loading...'}
+                </p>
+            </div>
+        );
+    }
+
+
 
     const handleEdit = (po: RekapPO) => {
         setEditingPO(po);
