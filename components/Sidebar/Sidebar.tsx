@@ -1,10 +1,9 @@
-// components/Sidebar.tsx
 'use client';
 
 import { useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaBars, FaTimes, FaWarehouse } from 'react-icons/fa';
+import { FaBars, FaTimes, FaWarehouse, FaClipboardList } from 'react-icons/fa';
 import { BiScan } from 'react-icons/bi'; // Import icon untuk Register Face
 import styles from './Sidebar.module.css';
 import { usePathname } from 'next/navigation';
@@ -68,7 +67,23 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                             className={`${styles.menuItem} ${pathname === '/stokgudang' ? styles.active : ''}`}
                         >
                             <FaWarehouse className="text-xl"/>
-                            <span> Stok Gudang</span>
+                            <span>Stok Gudang</span>
+                        </Link>
+                    </li>
+                    <li>
+                        <Link
+                            href="/rekappo"
+                            className={`${styles.menuItem} ${pathname === '/rekappo' ? styles.active : ''}`}
+                        >
+                            <FaClipboardList className="text-xl"/>
+                            <span className="flex items-center">
+                                Rekap PO
+                                {user?.role === 'superadmin' && (
+                                    <span className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded-full">
+                                        Superadmin
+                                    </span>
+                                )}
+                            </span>
                         </Link>
                     </li>
                     <li>
@@ -87,6 +102,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                             </span>
                         </Link>
                     </li>
+
                 </ul>
 
                 <div className={styles.profile}>
@@ -111,7 +127,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                 onClick={() => setIsOpen(!isOpen)}
                 type="button"
             >
-                {isOpen ? <FaTimes/> : <FaBars/>}
+                {isOpen ? <FaTimes /> : <FaBars />}
             </button>
         </div>
     );
