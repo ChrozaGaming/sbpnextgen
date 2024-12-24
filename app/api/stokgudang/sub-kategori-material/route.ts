@@ -1,57 +1,65 @@
-// app/api/stokgudang/sub-kategori-material/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 
 export async function GET(request: Request) {
     try {
-        // Parse URL and get query parameters
-        const url = new URL(request.url);
-        const page = parseInt(url.searchParams.get('page') || '1');
-        const limit = parseInt(url.searchParams.get('limit') || '10');
-        const searchTerm = url.searchParams.get('search') || '';
-        const offset = (page - 1) * limit;
+        const { searchParams } = new URL(request.url);
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '10');
+        const search = searchParams.get('search') || '';
+        const kategori = searchParams.get('kategori');
+        const brand = searchParams.get('brand');
+        const satuan = searchParams.get('satuan');
+        const status = searchParams.get('status');
 
-        // Build base query
-        let baseQuery = `
+        let query = `
+            SELECT 
+                skm.*,
+                km.nama as kategori_nama
             FROM sub_kategori_material skm
             LEFT JOIN kategori_material km ON skm.kategori_id = km.id
             WHERE 1=1
         `;
 
-        // Prepare search conditions and parameters
-        const conditions: string[] = [];
-        const values: any[] = [];
+        const queryParams: any[] = [];
 
-        if (searchTerm) {
-            conditions.push('(skm.nama LIKE ? OR skm.kode_item LIKE ?)');
-            values.push(`%${searchTerm}%`, `%${searchTerm}%`);
+        if (search) {
+            query += ` AND (skm.kode_item LIKE ? OR skm.nama LIKE ?)`;
+            queryParams.push(`%${search}%`, `%${search}%`);
         }
 
-        // Add conditions to base query if any
-        if (conditions.length > 0) {
-            baseQuery += ` AND ${conditions.join(' AND ')}`;
+        if (kategori) {
+            query += ` AND km.nama = ?`;
+            queryParams.push(kategori);
         }
 
-        // Get total count
-        const countQuery = `SELECT COUNT(*) as total ${baseQuery}`;
-        const [countRows] = await db.query<RowDataPacket[]>(countQuery, values);
-        const total = countRows[0].total;
+        if (brand) {
+            query += ` AND skm.brand = ?`;
+            queryParams.push(brand);
+        }
 
-        // Get paginated data
-        const dataQuery = `
-            SELECT 
-                skm.*,
-                km.nama as kategori_nama
-            ${baseQuery}
-            ORDER BY skm.updated_at DESC
-            LIMIT ? OFFSET ?
-        `;
+        if (satuan) {
+            query += ` AND skm.satuan = ?`;
+            queryParams.push(satuan);
+        }
 
-        const [rows] = await db.query<RowDataPacket[]>(
-            dataQuery,
-            [...values, limit, offset]
+        if (status) {
+            query += ` AND skm.status = ?`;
+            queryParams.push(status);
+        }
+
+        const [countResult] = await db.query(
+            `SELECT COUNT(*) as total FROM (${query}) as count_table`,
+            queryParams
         );
+
+        const total = (countResult as any)[0].total;
+
+        query += ` ORDER BY skm.updated_at DESC LIMIT ? OFFSET ?`;
+        queryParams.push(limit, (page - 1) * limit);
+
+        const [rows] = await db.query(query, queryParams);
 
         return NextResponse.json({
             success: true,
@@ -65,14 +73,12 @@ export async function GET(request: Request) {
         });
 
     } catch (error) {
-        console.error('Error in GET /api/stokgudang/sub-kategori-material:', error);
-        return NextResponse.json(
-            {
-                success: false,
-                message: error instanceof Error ? error.message : 'Unknown error occurred'
-            },
-            { status: 500 }
-        );
+        console.error('API Error:', error);
+        return NextResponse.json({
+            success: false,
+            message: 'Internal server error',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
     }
 }
 
@@ -80,7 +86,6 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        // Validate required fields
         const requiredFields = ['kategori_id', 'kode_item', 'nama', 'satuan'];
         for (const field of requiredFields) {
             if (!body[field]) {
@@ -94,10 +99,9 @@ export async function POST(request: Request) {
             }
         }
 
-        // Validate satuan
         const validSatuan = ['kg', 'kgset', 'pail', 'galon5liter', 'galon10liter',
             'pcs', 'lonjor', 'liter', 'literset', 'sak', 'unit'];
-        if (!validSatuan.includes(body.satuan)) {
+        if (!validSatuan.includes(body.satuan.toLowerCase())) {
             return NextResponse.json(
                 {
                     success: false,
@@ -107,10 +111,11 @@ export async function POST(request: Request) {
             );
         }
 
-        // Check if kode_item already exists
+        const brand = body.brand ? body.brand.trim() : null;
+
         const [existing] = await db.query<RowDataPacket[]>(
             'SELECT id FROM sub_kategori_material WHERE kode_item = ?',
-            [body.kode_item]
+            [body.kode_item.trim()]
         );
 
         if ((existing as RowDataPacket[]).length > 0) {
@@ -123,7 +128,6 @@ export async function POST(request: Request) {
             );
         }
 
-        // Insert new record
         const [result] = await db.query(
             `INSERT INTO sub_kategori_material (
                 kategori_id,
@@ -136,16 +140,15 @@ export async function POST(request: Request) {
             ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
                 body.kategori_id,
-                body.kode_item,
-                body.nama,
-                body.brand || null,
-                body.satuan,
-                body.status || 'aman',
-                body.keterangan || null
+                body.kode_item.trim(),
+                body.nama.trim(),
+                brand,
+                body.satuan.toLowerCase(),
+                (body.status || 'aman').toLowerCase(),
+                body.keterangan ? body.keterangan.trim() : null
             ]
         );
 
-        // Get inserted data
         const [newRow] = await db.query<RowDataPacket[]>(
             `SELECT 
                 skm.*,

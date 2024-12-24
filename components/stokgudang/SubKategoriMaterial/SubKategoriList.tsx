@@ -1,7 +1,10 @@
+// components/stokgudang/SubKategoriMaterial/SubKategoriList.tsx
+
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'react-hot-toast';
 import { EditModal } from './EditModal';
+import { FilterComponents } from './FilterComponents';
 
 interface SubKategoriMaterial {
     id: number;
@@ -10,8 +13,8 @@ interface SubKategoriMaterial {
     kode_item: string;
     nama: string;
     brand: string | null;
-    satuan: 'kg' | 'kgset' | 'pail' | 'galon5liter' | 'galon10liter' | 'pcs' | 'lonjor' | 'liter' | 'literset' | 'sak' | 'unit';
-    status: 'aman' | 'rusak' | 'cacat' | 'sisa';
+    satuan: string;
+    status: string;
     keterangan: string | null;
     created_at: string;
     updated_at: string;
@@ -24,35 +27,80 @@ interface PaginationData {
     pageSize: number;
 }
 
+interface CurrentFilters {
+    kategori: string;
+    brand: string;
+    satuan: string;
+    status: string;
+}
+
 const SubKategoriList = () => {
     const [items, setItems] = useState<SubKategoriMaterial[]>([]);
+    const [filteredItems, setFilteredItems] = useState<SubKategoriMaterial[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<SubKategoriMaterial | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletePassword, setDeletePassword] = useState('');
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    const [currentFilters, setCurrentFilters] = useState<CurrentFilters>({
+        kategori: '',
+        brand: '',
+        satuan: '',
+        status: ''
+    });
+
     const [pagination, setPagination] = useState<PaginationData>({
         total: 0,
         totalPages: 0,
         currentPage: 1,
         pageSize: 10
     });
+
     const fetchData = async (page: number = 1, search: string = '') => {
         try {
             setLoading(true);
-            const response = await fetch(
-                `/api/stokgudang/sub-kategori-material?page=${page}&limit=${pagination.pageSize}&search=${search}`
-            );
+            let queryParams = new URLSearchParams({
+                page: page.toString(),
+                limit: pagination.pageSize.toString(),
+            });
+
+            if (search) {
+                queryParams.append('search', search);
+            }
+
+            if (currentFilters.kategori) {
+                queryParams.append('kategori', currentFilters.kategori);
+            }
+
+            if (currentFilters.brand) {
+                queryParams.append('brand', currentFilters.brand);
+            }
+
+            if (currentFilters.satuan) {
+                queryParams.append('satuan', currentFilters.satuan);
+            }
+
+            if (currentFilters.status) {
+                queryParams.append('status', currentFilters.status);
+            }
+
+            const response = await fetch(`/api/stokgudang/sub-kategori-material?${queryParams}`);
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
             const data = await response.json();
 
             if (data.success) {
                 setItems(data.data);
+                setFilteredItems(data.data);
                 setPagination(data.pagination);
             } else {
-                throw new Error(data.message);
+                throw new Error(data.message || 'Failed to fetch data');
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -62,13 +110,19 @@ const SubKategoriList = () => {
         }
     };
 
-    useEffect(() => {
-        const delayDebounce = setTimeout(() => {
-            fetchData(1, searchTerm);
-        }, 300);
 
-        return () => clearTimeout(delayDebounce);
-    }, [searchTerm]);
+    useEffect(() => {
+        fetchData(1, searchTerm);
+    }, [searchTerm, currentFilters]);
+
+    const handleFilterChange = (newFilters: CurrentFilters) => {
+        setCurrentFilters(newFilters);
+        setPagination(prev => ({
+            ...prev,
+            currentPage: 1
+        }));
+    };
+
 
     const handleEdit = (item: SubKategoriMaterial) => {
         setSelectedItem(item);
@@ -78,181 +132,84 @@ const SubKategoriList = () => {
     const handleDelete = (id: number) => {
         setItemToDelete(id);
         setShowDeleteModal(true);
+        setDeleteError(null);
+        setDeletePassword('');
     };
 
     const confirmDelete = async () => {
-        if (deletePassword !== 'TES123') {
-            toast.error('Password salah');
-            return;
-        }
+        if (!itemToDelete) return;
 
         try {
             const response = await fetch(`/api/stokgudang/sub-kategori-material/${itemToDelete}`, {
                 method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: deletePassword }),
             });
+
             const data = await response.json();
 
             if (data.success) {
                 toast.success('Item berhasil dihapus');
-                fetchData(pagination.currentPage, searchTerm);
                 setShowDeleteModal(false);
                 setDeletePassword('');
                 setItemToDelete(null);
-                setDeleteError(null);
+                fetchData(pagination.currentPage, searchTerm);
             } else {
-                setDeleteError(data.message);
-                throw new Error(data.message);
+                setDeleteError(data.message || 'Password tidak valid');
             }
         } catch (error) {
             console.error('Error deleting item:', error);
-            setDeleteError(error instanceof Error ? error.message : 'Gagal menghapus item');
+            setDeleteError('Terjadi kesalahan saat menghapus item');
         }
     };
 
     const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'aman':
-                return 'bg-green-100 text-green-800';
-            case 'rusak':
-                return 'bg-red-100 text-red-800';
-            case 'cacat':
-                return 'bg-yellow-100 text-yellow-800';
-            case 'sisa':
-                return 'bg-orange-100 text-orange-800';
-            default:
-                return 'bg-gray-100 text-gray-800';
-        }
+        const colors = {
+            aman: 'bg-green-100 text-green-800',
+            rusak: 'bg-red-100 text-red-800',
+            cacat: 'bg-yellow-100 text-yellow-800',
+            sisa: 'bg-gray-100 text-gray-800'
+        };
+        return colors[status.toLowerCase()] || 'bg-gray-100 text-gray-800';
     };
+
     const renderPagination = () => {
-        const pageNumbers = [];
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, pagination.currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(pagination.totalPages, startPage + maxVisiblePages - 1);
-
-        if (endPage - startPage + 1 < maxVisiblePages) {
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-
-        for (let i = startPage; i <= endPage; i++) {
-            pageNumbers.push(i);
-        }
+        if (pagination.totalPages <= 1) return null;
 
         return (
-            <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6">
-                <div className="flex justify-between flex-1 sm:hidden">
-                    <button
-                        onClick={() => fetchData(pagination.currentPage - 1, searchTerm)}
-                        disabled={pagination.currentPage === 1}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md
-                            ${pagination.currentPage === 1
-                            ? 'bg-gray-100 text-gray-400'
-                            : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                        Previous
-                    </button>
-                    <button
-                        onClick={() => fetchData(pagination.currentPage + 1, searchTerm)}
-                        disabled={pagination.currentPage === pagination.totalPages}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md
-                            ${pagination.currentPage === pagination.totalPages
-                            ? 'bg-gray-100 text-gray-400'
-                            : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                        Next
-                    </button>
+            <div className="px-6 py-4 flex justify-between items-center bg-white">
+                <div className="text-sm text-gray-700">
+                    Showing {((pagination.currentPage - 1) * pagination.pageSize) + 1} to{' '}
+                    {Math.min(pagination.currentPage * pagination.pageSize, pagination.total)} of{' '}
+                    {pagination.total} results
                 </div>
-                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                        <p className="text-sm text-gray-700">
-                            Showing{' '}
-                            <span className="font-medium">
-                                {((pagination.currentPage - 1) * pagination.pageSize) + 1}
-                            </span>{' '}
-                            to{' '}
-                            <span className="font-medium">
-                                {Math.min(pagination.currentPage * pagination.pageSize, pagination.total)}
-                            </span>{' '}
-                            of{' '}
-                            <span className="font-medium">{pagination.total}</span>{' '}
-                            results
-                        </p>
-                    </div>
-                    <div>
-                        <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                            <button
-                                onClick={() => fetchData(1, searchTerm)}
-                                disabled={pagination.currentPage === 1}
-                                className={`relative inline-flex items-center px-2 py-2 rounded-l-md text-sm font-medium
-                                    ${pagination.currentPage === 1
-                                    ? 'bg-gray-100 text-gray-400'
-                                    : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <span className="sr-only">First</span>
-                                «
-                            </button>
-                            <button
-                                onClick={() => fetchData(pagination.currentPage - 1, searchTerm)}
-                                disabled={pagination.currentPage === 1}
-                                className={`relative inline-flex items-center px-2 py-2 text-sm font-medium
-                                    ${pagination.currentPage === 1
-                                    ? 'bg-gray-100 text-gray-400'
-                                    : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <span className="sr-only">Previous</span>
-                                ‹
-                            </button>
-                            {pageNumbers.map((page) => (
-                                <button
-                                    key={page}
-                                    onClick={() => fetchData(page, searchTerm)}
-                                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium
-                                        ${pagination.currentPage === page
-                                        ? 'z-10 bg-blue-600 text-white'
-                                        : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                                >
-                                    {page}
-                                </button>
-                            ))}
-                            <button
-                                onClick={() => fetchData(pagination.currentPage + 1, searchTerm)}
-                                disabled={pagination.currentPage === pagination.totalPages}
-                                className={`relative inline-flex items-center px-2 py-2 text-sm font-medium
-                                    ${pagination.currentPage === pagination.totalPages
-                                    ? 'bg-gray-100 text-gray-400'
-                                    : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <span className="sr-only">Next</span>
-                                ›
-                            </button>
-                            <button
-                                onClick={() => fetchData(pagination.totalPages, searchTerm)}
-                                disabled={pagination.currentPage === pagination.totalPages}
-                                className={`relative inline-flex items-center px-2 py-2 rounded-r-md text-sm font-medium
-                                    ${pagination.currentPage === pagination.totalPages
-                                    ? 'bg-gray-100 text-gray-400'
-                                    : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <span className="sr-only">Last</span>
-                                »
-                            </button>
-                        </nav>
-                    </div>
+                <div className="flex space-x-2">
+                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                            key={page}
+                            onClick={() => fetchData(page, searchTerm)}
+                            className={`px-3 py-1 rounded ${
+                                page === pagination.currentPage
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            {page}
+                        </button>
+                    ))}
                 </div>
             </div>
         );
     };
-    if (loading && !items.length) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-            </div>
-        );
-    }
 
     return (
         <div className="container mx-auto px-4 py-8">
             <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-                <h1 className="text-2xl font-bold text-gray-900">Daftar Produk Yang Sudah Terdaftar</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                    Daftar Produk Yang Sudah Terdaftar
+                </h1>
                 <div className="w-full md:w-1/3">
                     <input
                         type="text"
@@ -264,90 +221,132 @@ const SubKategoriList = () => {
                 </div>
             </div>
 
+            <FilterComponents
+                onFilterChange={(filters: CurrentFilters) => handleFilterChange(filters)}
+            />
+
+
             <div className="overflow-x-auto bg-white rounded-lg shadow">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                     <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Kategori
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Kode Item
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Nama
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Brand
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Satuan
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Keterangan
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Updated At
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Aksi
-                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode Item</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Satuan</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated At</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                     </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                    {items.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {item.kategori_nama}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {item.kode_item}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {item.nama}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {item.brand || '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {item.satuan}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                                        {item.status.toUpperCase()}
-                                    </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {item.keterangan || '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {dayjs(item.updated_at).format('DD/MM/YYYY HH:mm')}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                <button
-                                    onClick={() => handleEdit(item)}
-                                    className="text-blue-600 hover:text-blue-900"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(item.id)}
-                                    className="text-red-600 hover:text-red-900"
-                                >
-                                    Hapus
-                                </button>
+                    {loading ? (
+                        <tr>
+                            <td colSpan={9} className="px-6 py-4 text-center">
+                                Loading...
                             </td>
                         </tr>
-                    ))}
+                    ) : filteredItems.length === 0 ? (
+                        <tr>
+                            <td colSpan={9} className="px-6 py-4 text-center">
+                                Tidak ada data
+                            </td>
+                        </tr>
+                    ) : (
+                        filteredItems.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900">
+                                        {item.kategori_nama}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900">
+                                        {item.kode_item}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900">
+                                        {item.nama}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900">
+                                        {item.brand || '-'}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900">
+                                        {item.satuan}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
+                                            {item.status.toUpperCase()}
+                                        </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900">
+                                        {item.keterangan || '-'}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900">
+                                        {dayjs(item.updated_at).format('DD/MM/YYYY HH:mm')}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div className="flex space-x-3">
+                                        <button
+                                            onClick={() => handleEdit(item)}
+                                            className="text-blue-600 hover:text-blue-900 transition duration-150 ease-in-out flex items-center"
+                                        >
+                                            <svg
+                                                className="w-4 h-4 mr-1"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth="2"
+                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                                />
+                                            </svg>
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(item.id)}
+                                            className="text-red-600 hover:text-red-900 transition duration-150 ease-in-out flex items-center"
+                                        >
+                                            <svg
+                                                className="w-4 h-4 mr-1"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    )}
                     </tbody>
                 </table>
                 {renderPagination()}
             </div>
 
-            {/* Modals */}
             {showEditModal && (
                 <EditModal
                     item={selectedItem}
@@ -374,19 +373,13 @@ const SubKategoriList = () => {
                                     </svg>
                                 </div>
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">Konfirmasi Hapus</h3>
-
-                                {/* Error Message */}
                                 {deleteError && (
                                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                                        <p className="text-sm text-red-600">
-                                            {deleteError}
-                                        </p>
+                                        <p className="text-sm text-red-600">{deleteError}</p>
                                     </div>
                                 )}
-
                                 <p className="text-sm text-gray-500 mb-4">
-                                    Anda perlu memasukkan password untuk menghapus item ini.
-                                    <br />
+                                    Anda perlu memasukkan password untuk menghapus item ini.<br />
                                     Hubungi Admin System: <span className="font-medium">Bpk. Prasetyo Wibowo</span>
                                 </p>
                                 <div className="mb-4">
@@ -410,7 +403,7 @@ const SubKategoriList = () => {
                                             setShowDeleteModal(false);
                                             setDeletePassword('');
                                             setItemToDelete(null);
-                                            setDeleteError(null); // Reset error saat modal ditutup
+                                            setDeleteError(null);
                                         }}
                                         className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
                                     >
