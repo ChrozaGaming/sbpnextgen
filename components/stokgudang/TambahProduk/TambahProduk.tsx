@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Combobox } from '@headlessui/react';
 
 interface FormState {
     kategori_id: string;
@@ -29,6 +30,11 @@ interface SatuanOption {
     label: string;
 }
 
+interface BrandOption {
+    value: string;
+    label: string;
+}
+
 interface MessageState {
     type: string;
     content: string;
@@ -39,6 +45,10 @@ const TambahProduk = () => {
     const [loading, setLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [message, setMessage] = useState<MessageState>({ type: '', content: '' });
+    const [brands, setBrands] = useState<BrandOption[]>([]);
+    const [query, setQuery] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+
     const [formState, setFormState] = useState<FormState>({
         kategori_id: '',
         kode_item: '',
@@ -56,25 +66,56 @@ const TambahProduk = () => {
     ];
 
     const statusOptions: StatusOption[] = [
-        { value: 'aman', label: 'Aman' },
-        { value: 'rusak', label: 'Rusak' },
-        { value: 'cacat', label: 'Cacat' },
-        { value: 'sisa', label: 'Sisa' }
+        { value: 'aman', label: 'AMAN' },
+        { value: 'rusak', label: 'RUSAK' },
+        { value: 'cacat', label: 'CACAT' },
+        { value: 'sisa', label: 'SISA' }
     ];
 
     const satuanOptions: SatuanOption[] = [
-        { value: 'kg', label: 'Kilogram (kg)' },
-        { value: 'kgset', label: 'Kilogram Set (kg set)' },
-        { value: 'pail', label: 'Pail' },
-        { value: 'galon5liter', label: 'Galon 5 Liter' },
-        { value: 'galon10liter', label: 'Galon 10 Liter' },
-        { value: 'pcs', label: 'Pieces (pcs)' },
-        { value: 'lonjor', label: 'Lonjor' },
-        { value: 'liter', label: 'Liter' },
-        { value: 'literset', label: 'Liter Set' },
-        { value: 'sak', label: 'Sak' },
-        { value: 'unit', label: 'Unit' }
+        { value: 'kg', label: 'KILOGRAM (KG)' },
+        { value: 'kgset', label: 'KILOGRAM SET (KG SET)' },
+        { value: 'pail', label: 'PAIL' },
+        { value: 'galon5liter', label: 'GALON 5 LITER' },
+        { value: 'galon10liter', label: 'GALON 10 LITER' },
+        { value: 'pcs', label: 'PIECES (PCS)' },
+        { value: 'lonjor', label: 'LONJOR' },
+        { value: 'liter', label: 'LITER' },
+        { value: 'literset', label: 'LITER SET' },
+        { value: 'sak', label: 'SAK' },
+        { value: 'unit', label: 'UNIT' }
     ];
+
+    useEffect(() => {
+        const fetchBrands = async () => {
+            try {
+                const response = await fetch('/api/brands');
+                const data = await response.json();
+                if (data.success) {
+                    const formattedBrands = data.brands.map((brand: string) => ({
+                        value: brand,
+                        label: brand.toUpperCase()
+                    }));
+                    setBrands(formattedBrands);
+                }
+            } catch (error) {
+                console.error('Error fetching brands:', error);
+            }
+        };
+        fetchBrands();
+    }, []);
+
+    const filteredBrands = React.useMemo(() => {
+        if (!Array.isArray(brands)) return [];
+        return query === ''
+            ? brands
+            : brands.filter((brand) =>
+                brand.label
+                    .toLowerCase()
+                    .replace(/\s+/g, '')
+                    .includes(query.toLowerCase().replace(/\s+/g, ''))
+            );
+    }, [brands, query]);
 
     const capitalizeWords = (str: string) => {
         return str.split(' ')
@@ -90,7 +131,6 @@ const TambahProduk = () => {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-
         let formattedValue = value;
 
         switch (name) {
@@ -98,8 +138,10 @@ const TambahProduk = () => {
                 formattedValue = value.toUpperCase();
                 break;
             case 'nama':
-            case 'brand':
                 formattedValue = capitalizeWords(value);
+                break;
+            case 'brand':
+                formattedValue = value.toUpperCase();
                 break;
             default:
                 formattedValue = value;
@@ -111,7 +153,7 @@ const TambahProduk = () => {
         }));
     };
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setShowModal(true);
     };
@@ -163,7 +205,7 @@ const TambahProduk = () => {
     return (
         <>
             <div className="max-w-2xl mx-auto p-6">
-                <h1 className="text-2xl font-bold mb-6">Tambahkan Produk</h1>
+                <h1 className="text-2xl font-bold mb-6">Tambah Produk</h1>
 
                 {message.content && (
                     <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -195,7 +237,7 @@ const TambahProduk = () => {
 
                     <div>
                         <label htmlFor="kode_item" className="block text-sm font-medium text-gray-700 mb-1">
-                            Kode Item (Huruf Kapital)
+                            Kode Item (HURUF KAPITAL)
                         </label>
                         <input
                             type="text"
@@ -230,18 +272,117 @@ const TambahProduk = () => {
 
                     <div>
                         <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">
-                            Brand (Kapital Setiap Kata)
+                            Nama Brand (HURUF KAPITAL)
                         </label>
-                        <input
-                            type="text"
-                            id="brand"
-                            name="brand"
+                        <Combobox
                             value={formState.brand}
-                            onChange={handleInputChange}
-                            maxLength={100}
-                            placeholder="Masukkan Brand"
-                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        />
+                            onChange={value => setFormState(prev => ({
+                                ...prev,
+                                brand: value ? value.toUpperCase() : ''
+                            }))}
+                            as="div"
+                        >
+                            <div className="relative mt-1">
+                                <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white text-left border border-gray-300 focus-within:border-blue-500">
+                                    <Combobox.Input
+                                        className="w-full border-none p-2 pr-10 text-sm leading-5 text-gray-900 focus:ring-0"
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            setQuery(value);
+                                            setIsOpen(true);
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                brand: value ? value.toUpperCase() : ''
+                                            }));
+                                        }}
+                                        displayValue={(brand: string) => brand || ''}
+                                        onClick={() => setIsOpen(true)}
+                                        onFocus={() => setIsOpen(true)}
+                                        placeholder="PILIH ATAU KETIK NAMA BRAND"
+                                        style={{ textTransform: 'uppercase' }}
+                                    />
+                                    {formState.brand && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFormState(prev => ({ ...prev, brand: '' }));
+                                                setQuery('');
+                                                setIsOpen(false);
+                                            }}
+                                            className="absolute inset-y-0 right-8 flex items-center pr-2 cursor-pointer"
+                                        >
+                                            <svg
+                                                className="h-5 w-5 text-gray-400 hover:text-gray-600"
+                                                viewBox="0 0 20 20"
+                                                fill="currentColor"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                                    clipRule="evenodd"
+                                                />
+                                            </svg>
+                                        </button>
+                                    )}
+                                    <Combobox.Button
+                                        className="absolute inset-y-0 right-0 flex items-center pr-2"
+                                        onClick={() => setIsOpen(!isOpen)}
+                                    >
+                                        <svg
+                                            className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'transform rotate-180' : ''}`}
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 20 20"
+                                            fill="currentColor"
+                                        >
+                                            <path
+                                                fillRule="evenodd"
+                                                d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                                                clipRule="evenodd"
+                                            />
+                                        </svg>
+                                    </Combobox.Button>
+                                </div>
+                                {isOpen && (
+                                    <Combobox.Options
+                                        static
+                                        className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+                                    >
+                                        {filteredBrands.length === 0 && query !== '' ? (
+                                            <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                                                Brand baru akan ditambahkan
+                                            </div>
+                                        ) : (
+                                            filteredBrands.map((brand) => (
+                                                <Combobox.Option
+                                                    key={brand.value}
+                                                    value={brand.value}
+                                                    className={({ active }) =>
+                                                        `relative cursor-default select-none py-2 pl-4 pr-4 ${
+                                                            active ? 'bg-blue-600 text-white' : 'text-gray-900'
+                                                        }`
+                                                    }
+                                                    onClick={() => {
+                                                        setIsOpen(false);
+                                                        setQuery('');
+                                                    }}
+                                                >
+                                                    {({ selected, active }) => (
+                                                        <>
+                                                            <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                                                {brand.label}
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </Combobox.Option>
+                                            ))
+                                        )}
+                                    </Combobox.Options>
+                                )}
+                            </div>
+                        </Combobox>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Pilih brand yang sudah ada atau  <b>Ketik Manual</b> nama brand baru jika belum terdaftar
+                        </p>
                     </div>
 
                     <div>
@@ -308,55 +449,52 @@ const TambahProduk = () => {
                                 : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
                         }`}
                     >
-                        {loading ? 'Menyimpan...' : 'Simpan Sub Kategori'}
+                        {loading ? 'Menyimpan...' : 'Simpan Produk'}
                     </button>
                 </form>
             </div>
 
-            {/* Modal Konfirmasi */}
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg max-w-3xl max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
                             <div className="space-y-4">
                                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                                    <div className="text-sm text-yellow-800">
-                                        <div className="flex items-center mb-4">
-                                            <svg className="h-6 w-6 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                            </svg>
-                                            <span className="font-bold text-lg">PERHATIAN!</span>
-                                        </div>
+                                    <div className="flex items-center mb-4">
+                                        <svg className="h-6 w-6 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        <span className="font-bold text-lg">PERHATIAN!</span>
+                                    </div>
 
-                                        <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500">
-                                            <div className="font-bold text-red-700 text-center space-y-1">
-                                                <p>"SAYA BERSUNGGUH-SUNGGUH MENGISI DATA</p>
-                                                <p>DENGAN VALID DAN BENAR,</p>
-                                                <p>DAN DAPAT DIPERTANGGUNGJAWABKAN SELURUHNYA!"</p>
-                                            </div>
+                                    <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500">
+                                        <div className="font-bold text-red-700 text-center space-y-1">
+                                            <p>"SAYA BERSUNGGUH-SUNGGUH MENGISI DATA</p>
+                                            <p>DENGAN VALID DAN BENAR,</p>
+                                            <p>DAN DAPAT DIPERTANGGUNGJAWABKAN SELURUHNYA!"</p>
                                         </div>
+                                    </div>
 
-                                        <div className="mb-3">
-                                            <p className="font-semibold mb-2">Detail Data yang akan disimpan:</p>
-                                            <ul className="list-disc ml-5 space-y-1 text-gray-700">
-                                                <li>Kategori: {kategoriOptions.find(opt => opt.value === Number(formState.kategori_id))?.label}</li>
-                                                <li>Kode Item: {formState.kode_item}</li>
-                                                <li>Nama: {formState.nama}</li>
-                                                <li>Brand: {formState.brand || '-'}</li>
-                                                <li>Satuan: {satuanOptions.find(opt => opt.value === formState.satuan)?.label}</li>
-                                                <li>Status: {statusOptions.find(opt => opt.value === formState.status)?.label}</li>
-                                            </ul>
-                                        </div>
+                                    <div className="mb-3">
+                                        <p className="font-semibold mb-2">Detail Data yang akan disimpan:</p>
+                                        <ul className="list-disc ml-5 space-y-1 text-gray-700">
+                                            <li>Kategori: {kategoriOptions.find(opt => opt.value === Number(formState.kategori_id))?.label}</li>
+                                            <li>Kode Item: {formState.kode_item}</li>
+                                            <li>Nama: {formState.nama}</li>
+                                            <li>Brand: {formState.brand || '-'}</li>
+                                            <li>Satuan: {satuanOptions.find(opt => opt.value === formState.satuan)?.label}</li>
+                                            <li>Status: {statusOptions.find(opt => opt.value === formState.status)?.label}</li>
+                                        </ul>
+                                    </div>
 
-                                        <div className="border-t border-yellow-300 pt-3">
-                                            <p className="font-semibold mb-2">Dengan menekan tombol SETUJU & SIMPAN, Saya menyatakan bahwa:</p>
-                                            <ul className="list-disc ml-5 space-y-1 text-red-600 font-medium">
-                                                <li>Data yang dimasukkan sudah VALID dan BENAR</li>
-                                                <li>Data TIDAK DAPAT DIEDIT atau DIHAPUS tanpa persetujuan Sistem Administrasi</li>
-                                                <li>Saya BERTANGGUNG JAWAB PENUH atas kebenaran data</li>
-                                                <li>Saya SIAP MENERIMA SANKSI sesuai kebijakan PT SINAR BUANA PRIMA</li>
-                                            </ul>
-                                        </div>
+                                    <div className="border-t border-yellow-300 pt-3">
+                                        <p className="font-semibold mb-2">Dengan menekan tombol SETUJU & SIMPAN, Saya menyatakan bahwa:</p>
+                                        <ul className="list-disc ml-5 space-y-1 text-red-600 font-medium">
+                                            <li>Data yang dimasukkan sudah VALID dan BENAR</li>
+                                            <li>Data TIDAK DAPAT DIEDIT atau DIHAPUS tanpa persetujuan Sistem Administrasi</li>
+                                            <li>Saya BERTANGGUNG JAWAB PENUH atas kebenaran data</li>
+                                            <li>Saya SIAP MENERIMA SANKSI sesuai kebijakan PT SINAR BUANA PRIMA</li>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>

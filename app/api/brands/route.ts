@@ -8,8 +8,8 @@ export async function GET() {
         const [rows] = await db.query(`
             SELECT DISTINCT 
                 CASE 
-                    WHEN brand IS NULL OR TRIM(brand) = '' THEN 'Tanpa Brand'
-                    ELSE brand 
+                    WHEN brand IS NULL OR TRIM(brand) = '' THEN 'TANPA BRAND'
+                    ELSE UPPER(brand)
                 END as brand
             FROM sub_kategori_material
             WHERE brand IS NOT NULL 
