@@ -1,299 +1,215 @@
 import jsPDF from "jspdf";
-import 'jspdf-autotable';
-import autoTable from 'jspdf-autotable';
-import { FormData, BarangItem } from '@/types/suratJalan';
-import { formatDate } from '../../dateFormatter';
-const logoPath = '/images/logo.png';
+import "jspdf-autotable";
 
-interface jsPDFCustom extends jsPDF {
-    autoTable: typeof autoTable;
-    previousAutoTable: {
-        finalY: number;
-    };
+interface BarangDetail {
+    kode: string | null;
+    nama: string | null;
+    jumlah: number | null;
+    satuan: string | null;
 }
 
-function formatTanggal(dateString: string): string {
-    const days = [
-        'Minggu', 'Senin', 'Selasa', 'Rabu',
-        'Kamis', 'Jumat', 'Sabtu'
-    ];
-
-    const months = [
-        'Januari', 'Februari', 'Maret', 'April',
-        'Mei', 'Juni', 'Juli', 'Agustus',
-        'September', 'Oktober', 'November', 'Desember'
-    ];
-
-    const date = new Date(dateString);
-    const dayName = days[date.getDay()];
-    const day = date.getDate();
-    const month = months[date.getMonth()];
-    const year = date.getFullYear();
-
-    return `${dayName}, ${day} ${month} ${year}`;
+interface SuratJalan {
+    nomor_surat: string;
+    tujuan: string;
+    tanggal: string;
+    nomor_kendaraan: string | null;
+    no_po: string | null;
+    barang: BarangDetail[];
 }
 
-const COPY_COLORS = {
-    BLACK: { r: 0, g: 0, b: 0 },          // Hitam untuk ACC
-    PINK: { r: 255, g: 192, b: 203 },     // Pink untuk Admin Gudang
-    GREEN: { r: 144, g: 238, b: 144 },    // Hijau untuk Penerima
-    ORANGE: { r: 255, g: 165, b: 0 },     // Orange untuk Arsip
-    WHITE: { r: 255, g: 255, b: 255 }
+const formatTanggal = (tanggal: string): string => {
+    const hari = [
+        "Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"
+    ];
+    const bulan = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    const date = new Date(tanggal);
+    const namaHari = hari[date.getDay()];
+    const tgl = date.getDate().toString().padStart(2, "0");
+    const namaBulan = bulan[date.getMonth()];
+    const tahun = date.getFullYear();
+
+    return `${namaHari}, ${tgl} ${namaBulan} ${tahun}`;
 };
 
-const createHeader = (doc: jsPDFCustom, color: { r: number, g: number, b: number }, copyText: string): void => {
-    doc.addImage(logoPath, 'PNG', 15, 15, 25, 25);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("PT. SINAR BUANA PRIMA", 45, 25);
-    doc.text("SURAT JALAN / DELIVERY ORDER", 105, 16, { align: 'center' });
-
-    doc.setFontSize(7);
-    doc.setTextColor(color.r, color.g, color.b);
-    doc.text(`[${copyText}]`, 180, 16);
-    doc.setTextColor(COPY_COLORS.BLACK.r, COPY_COLORS.BLACK.g, COPY_COLORS.BLACK.b);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("General Contractor, Supplier & Trading", 45, 32);
-    doc.text("Jl. Raya Gelam Gg. Kemuning No. 27, Candi - Sidoarjo", 45, 37);
-    doc.text("Telp: 031-8967577 | Fax: 031-8970521", 45, 42);
-    doc.text("Email: sinarbuanaprima@yahoo.co.id", 45, 47);
-
-    doc.setDrawColor(color.r, color.g, color.b);
-    doc.setLineWidth(0.5);
-    doc.line(15, 55, 195, 55);
-};
-
-const createDocumentDetails = (doc: jsPDFCustom, formData: FormData, color: { r: number, g: number, b: number }): void => {
-    doc.setDrawColor(color.r, color.g, color.b);
-
-    // Set warna fill berdasarkan jenis copy
-    if (color === COPY_COLORS.BLACK) {
-        doc.setFillColor(200, 200, 200); // Abu-abu muda untuk ACC
-    } else if (color === COPY_COLORS.PINK) {
-        doc.setFillColor(255, 235, 238); // Pink muda untuk ADM.GUDANG
-    } else if (color === COPY_COLORS.GREEN) {
-        doc.setFillColor(235, 255, 238); // Hijau muda untuk PENERIMA
-    } else if (color === COPY_COLORS.ORANGE) {
-        doc.setFillColor(255, 245, 230); // Orange muda untuk ARSIP
+export const generatePDF = (item: SuratJalan) => {
+    if (!item || !item.barang || !Array.isArray(item.barang)) {
+        console.error('Data surat jalan tidak valid:', item);
+        alert('Data surat jalan tidak valid. Tidak dapat mencetak PDF.');
+        return;
     }
+    const {nomor_surat, tujuan, tanggal, barang, no_po, nomor_kendaraan} = item;
+    const keteranganProyek = item.keterangan_proyek || "-";
 
-    doc.rect(15, 60, 180, 42, 'F');
+    const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "A5",
+    });
 
-    const detailStartY = 68;
-    const detailLineHeight = 7;
+    const rowsPerPage = 10; // Max rows per page
+    const scale = 0.7; // Skala untuk memperkecil ukuran footer
 
-    const leftLabels = [
-        { label: "No. Surat", value: formData.noSurat },
-        { label: "Tanggal", value: formatTanggal(formData.tanggal) },
-        { label: "No. PO", value: formData.noPO }
-    ];
+    const generatePage = (pageItems: BarangDetail[]) => {
+        const currentBackgroundColor = "#FFFFFF";
+        const currentBorderColor = "#000000";
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+        // Header
+        const logoUrl = "https://i.imgur.com/AY0XZbq.jpeg";
+        doc.addImage(logoUrl, "JPEG", 10, 1.5, 90, 20);
 
-    leftLabels.forEach((item, index) => {
-        const y = detailStartY + (index * detailLineHeight);
-        doc.text(item.label, 20, y);
-        doc.text(":", 60, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(item.value, 65, y);
+        const titleX = 145;
+        const titleY = 15;
+        const titleAlign: "left" | "center" | "right" = "center";
+
+        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-    });
+        doc.setTextColor(0, 0, 0);
+        doc.text(`SURAT JALAN / DELIVERY ORDER`, titleX, titleY, {align: titleAlign});
 
-    const rightLabels = [
-        { label: "No. Kendaraan", value: formData.noKendaraan },
-        { label: "Ekspedisi", value: formData.ekspedisi },
-        { label: "Kepada", value: formData.tujuan }
-    ];
+        // **Keterangan Proyek di bawah tanggal**
+        const detailStartY = titleY + 10;
 
-    rightLabels.forEach((item, index) => {
-        const y = detailStartY + (index * detailLineHeight);
-        doc.text(item.label, 110, y);
-        doc.text(":", 150, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(item.value, 155, y);
+// Atur font size untuk tujuan
+        doc.setFontSize(8); // Ukuran font lebih kecil untuk tujuan
         doc.setFont("helvetica", "bold");
-    });
-};
-const createItemsTable = (
-    doc: jsPDFCustom,
-    barang: BarangItem[],
-    startIndex: number,
-    itemsPerPage: number,
-    color: { r: number, g: number, b: number },
-    isFirstPage: boolean
-): void => {
-    const endIndex = Math.min(startIndex + itemsPerPage, barang.length);
-    const items = barang.slice(startIndex, endIndex);
 
-    doc.autoTable({
-        startY: isFirstPage ? 107 : 30,
-        head: [["No", "Jumlah", "Kemasan", "Kode", "Nama Barang", "Keterangan"]],
-        body: items.map((item, index) => [
-            startIndex + index + 1,
-            item.jumlah,
-            item.kemasan,
-            item.kode,
-            item.nama,
-            item.keterangan,
-        ]),
-        theme: 'grid',
-        headStyles: {
-            fillColor: [color.r, color.g, color.b],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'center',
-            valign: 'middle',
-            fontSize: 10,
-            cellPadding: 3
-        },
-        columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 20 },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 25 },
-            4: { cellWidth: 50 },
-            5: { cellWidth: 40 }
-        },
-        margin: { left: 15, right: 15 }
-    });
-};
+// Atur margin kiri, kanan, dan batas lebar teks
+        const marginLeft = 10;
+        const marginRight = 70; // Batas margin kanan
+        const maxWidth = marginRight - marginLeft;
 
-const createSignatures = (doc: jsPDFCustom, startY: number): void => {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+// "Kepada Yth" dengan margin dan wrapping otomatis
+        doc.text(`Kepada Yth: ${tujuan}`, marginLeft, detailStartY, {
+            maxWidth: maxWidth,
+        });
 
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const leftX = pageWidth * 0.2;
-    const centerX = pageWidth * 0.5;
-    const rightX = pageWidth * 0.8;
+// Kembali ke font size 10 untuk elemen lainnya
+        doc.setFontSize(8); // Ukuran font standar
+        doc.text(`No: ${nomor_surat}`, 147, detailStartY + 5); // Posisi secara manual
+        doc.text(`Tgl / Date: ${formatTanggal(tanggal)}`, 147, detailStartY + 9); // Posisi secara manual
 
-    const signatures = [
-        {
-            title: "Barang Diterima Oleh:",
-            x: leftX,
-            lines: [
-                "Tgl: _________________",
-                "Nama Jelas / Stempel:",
-                "",
-                "",
-                "_____________________"
-            ]
-        },
-        {
-            title: "Ditandatangani oleh:",
-            x: centerX,
-            lines: [
-                "Sopir:",
-                "",
-                "",
-                "_____________________",
-                "Satpam:",
-                "",
-                "",
-                "_____________________"
-            ]
-        },
-        {
-            title: "Hormat Kami,",
-            x: rightX,
-            lines: [
-                "",
-                "",
-                "_____________________",
-                "",
-                "Nama Jelas",
-                "Pengawas Gudang"
-            ]
+// Baris pertama: "Keterangan Proyek:"
+        doc.text("Keterangan Proyek:", 105, detailStartY, {align: "center"});
+
+// Batasi panjang karakter maksimum untuk keteranganProyek menjadi 256
+        const truncatedKeterangan = keteranganProyek.slice(0, 120);
+
+// Baris kedua: nilai keteranganProyek dengan pembatasan margin
+        doc.text(truncatedKeterangan, 105, detailStartY + 5, {
+            align: "center",
+            maxWidth: 70, // Atur lebar maksimum teks dalam mm
+        });
+
+        doc.text(`No. PO: ${no_po || "-"}`, 168, detailStartY + 7, {align: "right"});
+        doc.text(`No. Kendaraan: ${nomor_kendaraan || "-"}`, 180, detailStartY + 11, {align: "right"});
+
+        // Barang Table
+        const tableStartY = detailStartY + 15;
+        const tableData = pageItems.map((barang, index) => [
+            index + 1,
+            barang.jumlah ?? "",
+            barang.satuan ?? "",
+            barang.kode ?? "",
+            barang.nama ?? "",
+            "",
+        ]);
+
+        while (tableData.length < rowsPerPage) {
+            tableData.push(["", "", "", "", "", ""]);
         }
-    ];
 
-    const centerText = (text: string, x: number): number => {
-        const textWidth = doc.getTextWidth(text);
-        return x - (textWidth / 2);
+        doc.autoTable({
+            startY: tableStartY,
+            head: [["No", "Jumlah", "Satuan", "No. Kode", "Nama Barang", "Keterangan"]],
+            body: tableData,
+            styles: {
+                fontSize: 8,
+                halign: "center",
+                valign: "middle",
+                lineWidth: 0.2,
+                cellPadding: 2,
+                fillColor: currentBackgroundColor,
+            },
+            headStyles: {
+                fillColor: currentBackgroundColor,
+                textColor: 0,
+                lineWidth: 0.5,
+                lineColor: currentBorderColor,
+            },
+            bodyStyles: {
+                lineColor: currentBorderColor,
+            },
+            theme: "grid",
+            tableLineColor: currentBorderColor,
+            tableLineWidth: 0.5,
+        });
+
+        // Footer Group
+        const footerStartY = doc.lastAutoTable.finalY + 0 * scale;
+
+        // Footer Boxes
+        const boxWidth = 26.4;
+        const footerBoxHeight = 15; // Unique name
+        const boxSpacing = 10; // Unique name
+
+        const drawFooterGroup = (doc: any, startX: number, startY: number) => {
+            // Barang Diterima Oleh
+            doc.rect(startX, startY, boxWidth + 10, footerBoxHeight + 5);
+            doc.setFontSize(6);
+            doc.text("Barang Diterima Oleh:", startX + 2, startY + 2.3);
+            doc.text("Tgl:", startX + 2, startY + 5);
+            doc.text("Nama Jelas / Stempel", startX + 2, startY + 19);
+
+            // Supir
+            const supirX = startX + boxWidth + boxSpacing;
+            doc.rect(supirX, startY, boxWidth + 10, footerBoxHeight + 5);
+            doc.text("Supir", supirX + 15, startY + 19);
+
+            // Satpam
+            const satpamX = startX + (boxWidth + boxSpacing) * 2;
+            doc.rect(satpamX, startY, boxWidth + 10, footerBoxHeight + 5);
+            doc.text("Satpam", satpamX + 14, startY + 19);
+
+            // Pengawas
+            const pengawasX = startX + (boxWidth + boxSpacing) * 3;
+            doc.rect(pengawasX, startY, boxWidth + 10, footerBoxHeight + 5);
+            doc.text("Pengawas", pengawasX + 13.5, startY + 19);
+
+            // Kepala Gudang
+            const kepalaGudangX = startX + (boxWidth + boxSpacing) * 4;
+            doc.rect(kepalaGudangX, startY, boxWidth + 10, footerBoxHeight + 5);
+            doc.text("Hormat Kami", kepalaGudangX + 11.3, startY + 2.4);
+            doc.text("Kepala Gudang", kepalaGudangX + 10.5, startY + 19);
+        };
+
+        drawFooterGroup(doc, 14, footerStartY);
+        // Footer Notes
+// Fungsi untuk menggambar grup keterangan
+        const drawFooterNote = (doc, xOffset, yOffset, scale) => {
+            const baseFontSize = 8 * scale; // Set font size sekali untuk semua teks
+            doc.setFontSize(baseFontSize);
+
+            // Grup teks keterangan
+            doc.text("Keterangan:", 10 + xOffset, footerStartY + yOffset); // Geser horizontal/vertikal
+            doc.text("Putih: ACC", 50 + xOffset, footerStartY + yOffset);
+            doc.text("Merah: Adm. Gudang", 90 + xOffset, footerStartY + yOffset);
+            doc.text("Hijau: Penerima", 150 + xOffset, footerStartY + yOffset);
+            doc.text("Kuning: Arsip", 190 + xOffset, footerStartY + yOffset);
+        };
+
+// Panggil fungsi dengan offset
+        const xOffset = 0; // Geser horizontal (positif = kanan, negatif = kiri)
+        const yOffset = 24.5; // Geser vertikal (positif = bawah, negatif = atas)
+        drawFooterNote(doc, xOffset, yOffset, scale);
+
     };
 
-    signatures.forEach(sig => {
-        doc.text(sig.title, centerText(sig.title, sig.x), startY);
-        sig.lines.forEach((line, index) => {
-            doc.text(line, centerText(line, sig.x), startY + ((index + 1) * 7));
-        });
-    });
+    generatePage(item.barang.slice(0, rowsPerPage));
+
+    doc.save(`Surat_Jalan_${nomor_surat}.pdf`);
 };
 
-const createFooter = (
-    doc: jsPDFCustom,
-    username: string,
-    copyText: string,
-    color: { r: number, g: number, b: number },
-    currentPage: number,
-    totalPages: number
-): void => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    doc.setDrawColor(color.r, color.g, color.b);
-    doc.setLineWidth(0.5);
-    doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
-
-    doc.setFontSize(8);
-    doc.setTextColor(128);
-    doc.text([
-        `Dicetak pada: ${formatDate()}`,
-        `Dicetak oleh: Admin ${username}`,
-        `Copy: ${copyText}`,
-        `Halaman ${currentPage} dari ${totalPages}`
-    ], pageWidth - 15, pageHeight - 25, {
-        align: 'right',
-        lineHeightFactor: 1.5
-    });
-};
-
-export const generateMultiCopyPDF = (
-    formData: FormData,
-    barang: BarangItem[],
-    username: string
-): jsPDFCustom => {
-    const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-    }) as jsPDFCustom;
-
-    const itemsPerPage = 10;
-    const copies = [
-        { color: COPY_COLORS.BLACK, text: "ACC", textColor: COPY_COLORS.WHITE },
-        { color: COPY_COLORS.PINK, text: "ADM.GUDANG", textColor: COPY_COLORS.BLACK },
-        { color: COPY_COLORS.GREEN, text: "PENERIMA", textColor: COPY_COLORS.BLACK },
-        { color: COPY_COLORS.ORANGE, text: "ARSIP", textColor: COPY_COLORS.BLACK }
-    ];
-
-    copies.forEach((copy, copyIndex) => {
-        const totalPages = Math.ceil(barang.length / itemsPerPage);
-
-        for (let page = 0; page < totalPages; page++) {
-            if (copyIndex > 0 || page > 0) {
-                doc.addPage();
-            }
-
-            if (page === 0) {
-                createHeader(doc, copy.color, copy.text);
-                createDocumentDetails(doc, formData, copy.color);
-            }
-
-            const startIndex = page * itemsPerPage;
-            createItemsTable(doc, barang, startIndex, itemsPerPage, copy.color, page === 0);
-
-            if (page === totalPages - 1) {
-                const finalY = doc.previousAutoTable.finalY + 10;
-                createSignatures(doc, finalY);
-            }
-
-            createFooter(doc, username, copy.text, copy.color, page + 1, totalPages);
-        }
-    });
-
-    return doc;
-};

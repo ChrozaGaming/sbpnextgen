@@ -1,4 +1,3 @@
-// app/api/stok/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
@@ -10,13 +9,9 @@ export async function GET(request: Request) {
         const limit = Math.max(1, parseInt(searchParams.get('limit') || '10'));
         const offset = (page - 1) * limit;
 
-        // Get total count
-        const [countResult] = await db.query<RowDataPacket[]>(
-            'SELECT COUNT(*) as total FROM stok'
-        );
+        const [countResult] = await db.query<RowDataPacket[]>('SELECT COUNT(*) as total FROM stok');
         const total = countResult[0].total;
 
-        // Get paginated data
         const [rows] = await db.query<RowDataPacket[]>(
             `SELECT 
                 s.*,
@@ -28,10 +23,10 @@ export async function GET(request: Request) {
             LEFT JOIN sub_kategori_material sm ON s.sub_kategori_id = sm.id
             LEFT JOIN kategori_material km ON sm.kategori_id = km.id
             ORDER BY s.tanggal_entry DESC
-            LIMIT ${limit} OFFSET ${offset}`
+            LIMIT ? OFFSET ?`,
+            [limit, offset]
         );
 
-        // Format response
         const formattedRows = rows.map(row => ({
             id: row.id,
             kode: row.kode,
@@ -63,15 +58,10 @@ export async function GET(request: Request) {
                 pageSize: limit
             }
         });
-
     } catch (error) {
         console.error('Error fetching stok:', error);
         return NextResponse.json(
-            {
-                success: false,
-                message: 'Gagal mengambil data stok',
-                error: error instanceof Error ? error.message : 'Unknown error'
-            },
+            { success: false, message: 'Gagal mengambil data stok', error: error.message },
             { status: 500 }
         );
     }
@@ -81,10 +71,6 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        // Log received data
-        console.log('Received body:', body);
-
-        // Validate all required fields with detailed messages
         const validations = {
             kode: body.kode?.trim(),
             nama: body.nama?.trim(),
@@ -97,7 +83,6 @@ export async function POST(request: Request) {
             tanggal_masuk: body.tanggal_masuk
         };
 
-        // Check for missing or invalid fields
         const invalidFields = Object.entries(validations).filter(([key, value]) => {
             if (key === 'stok_masuk') return isNaN(value) || value <= 0;
             if (key === 'sub_kategori_id') return isNaN(value) || value <= 0;
@@ -112,73 +97,83 @@ export async function POST(request: Request) {
             }, { status: 400 });
         }
 
-        // Proceed with database operations...
         await db.query('START TRANSACTION');
 
         try {
-            // Check if sub_kategori exists
-            const [subKategoriRows] = await db.query<RowDataPacket[]>(
-                'SELECT id FROM sub_kategori_material WHERE id = ?',
-                [validations.sub_kategori_id]
+            const [existingStok] = await db.query<RowDataPacket[]>(
+                'SELECT id, stok_sisa, stok_masuk FROM stok WHERE kode = ?',
+                [validations.kode]
             );
 
-            if (!subKategoriRows.length) {
-                await db.query('ROLLBACK');
+            if (existingStok.length > 0) {
+                const existingData = existingStok[0];
+                const updatedStokMasuk = existingData.stok_masuk + validations.stok_masuk;
+                const updatedStokSisa = existingData.stok_sisa + validations.stok_masuk;
+
+                await db.query(
+                    `UPDATE stok 
+                     SET stok_masuk = ?, stok_sisa = ?, updated_at = CURRENT_TIMESTAMP 
+                     WHERE id = ?`,
+                    [updatedStokMasuk, updatedStokSisa, existingData.id]
+                );
+
+                await db.query('COMMIT');
+
                 return NextResponse.json({
-                    success: false,
-                    message: 'Sub kategori tidak ditemukan'
-                }, { status: 404 });
+                    success: true,
+                    message: `Stok dengan kode ${validations.kode} berhasil diperbarui.`,
+                    updatedData: {
+                        id: existingData.id,
+                        stok_masuk: updatedStokMasuk,
+                        stok_sisa: updatedStokSisa
+                    }
+                });
+            } else {
+                const stok_sisa = validations.stok_masuk;
+
+                const [result] = await db.query(
+                    `INSERT INTO stok (
+                        kode, nama, kategori, sub_kategori_id,
+                        stok_masuk, stok_keluar, stok_sisa,
+                        satuan, lokasi, tanggal_entry,
+                        tanggal_masuk, keterangan
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        validations.kode,
+                        validations.nama,
+                        validations.kategori,
+                        validations.sub_kategori_id,
+                        validations.stok_masuk,
+                        0,
+                        stok_sisa,
+                        validations.satuan,
+                        validations.lokasi,
+                        validations.tanggal_entry,
+                        validations.tanggal_masuk || null,
+                        body.keterangan || null
+                    ]
+                );
+
+                await db.query('COMMIT');
+
+                return NextResponse.json({
+                    success: true,
+                    message: 'Data stok berhasil ditambahkan.',
+                    data: {
+                        id: (result as any).insertId,
+                        ...validations
+                    }
+                });
             }
-
-            // Calculate stok_sisa
-            const stok_sisa = validations.stok_masuk;
-
-            // Insert new stok
-            const [result] = await db.query(
-                `INSERT INTO stok (
-                    kode, nama, kategori, sub_kategori_id,
-                    stok_masuk, stok_keluar, stok_sisa,
-                    satuan, lokasi, tanggal_entry,
-                    tanggal_masuk, keterangan
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    validations.kode,
-                    validations.nama,
-                    validations.kategori,
-                    validations.sub_kategori_id,
-                    validations.stok_masuk,
-                    0, // stok_keluar
-                    stok_sisa,
-                    validations.satuan,
-                    validations.lokasi,
-                    validations.tanggal_entry,
-                    validations.tanggal_masuk || null,
-                    body.keterangan || null
-                ]
-            );
-
-            await db.query('COMMIT');
-
-            return NextResponse.json({
-                success: true,
-                message: 'Data stok berhasil ditambahkan',
-                data: {
-                    id: (result as any).insertId,
-                    ...validations
-                }
-            });
-
         } catch (error) {
             await db.query('ROLLBACK');
             throw error;
         }
-
     } catch (error) {
-        console.error('Error creating stok:', error);
-        return NextResponse.json({
-            success: false,
-            message: 'Gagal menambahkan data stok',
-            error: error instanceof Error ? error.message : 'Unknown error'
-        }, { status: 500 });
+        console.error('Error creating/updating stok:', error);
+        return NextResponse.json(
+            { success: false, message: 'Gagal memproses data stok', error: error.message },
+            { status: 500 }
+        );
     }
 }

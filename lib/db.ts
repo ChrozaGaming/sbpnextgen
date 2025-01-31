@@ -1,5 +1,3 @@
-// lib/db.ts
-
 import mysql from 'mysql2/promise';
 
 const db = mysql.createPool({
@@ -9,21 +7,8 @@ const db = mysql.createPool({
     database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
 });
 
-// Test koneksi
-const testConnection = async () => {
-    try {
-        const connection = await db.getConnection();
-        console.log('Database connected successfully!');
-        connection.release();
-        return true;
-    } catch (error) {
-        console.error('Database connection error:', error);
-        return false;
-    }
-};
-
-// Single export statement for both db and testConnection
-export { db, testConnection };
+// Ekspor koneksi database sebagai named export
+export { db };
