@@ -195,7 +195,7 @@ export default function Dashboard() {
                     </div>
 
 
-                    <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+                    {/* <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
                         <div className="bg-white overflow-hidden shadow rounded-lg">
                             <div className="p-5">
                                 <div className="flex items-center">
@@ -246,7 +246,7 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
             </main>
         </div>
