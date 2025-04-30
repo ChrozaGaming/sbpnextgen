@@ -3,10 +3,13 @@ import { db } from '@/lib/db';
 
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        // Await the entire params object first, then access properties
+        const paramsData = await context.params;
+        const id = paramsData.id;
+        
         const data = await request.json();
 
         // Validate ID
@@ -61,10 +64,10 @@ export async function PUT(
 
             const [result] = await db.execute(
                 `UPDATE rekap_po
-                 SET biaya_pelaksanaan = ?,
-                     profit = ?,
-                     status = ?
-                 WHERE id = ?`,
+                SET biaya_pelaksanaan = ?,
+                    profit = ?,
+                    status = ?
+                WHERE id = ?`,
                 [biaya, profit, status, id]
             );
 

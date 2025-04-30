@@ -1,31 +1,74 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { RowDataPacket, OkPacket, ResultSetHeader } from 'mysql2';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
-// Definisi tipe untuk hasil query
 type QueryResultRow = RowDataPacket & {
   id: number;
   tujuan: string;
   nomor_surat: string;
   tanggal: string;
-  // tambahkan properti lain sesuai kebutuhan
+  no_po: string;
+  keterangan_proyek: string;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const [suratJalanRows] = await db.query(`
-      SELECT sj.*, 
-      (SELECT COUNT(*) FROM surat_jalan_detail WHERE surat_jalan_id = sj.id) as jumlah_barang
-      FROM surat_jalan sj
-      ORDER BY sj.tanggal DESC
-    `) as [QueryResultRow[], any];
+    const { searchParams } = new URL(request.url);
 
-    // Gunakan tipe spesifik untuk hasil query
+    const search = searchParams.get('search') || '';
+    const field = searchParams.get('field') || 'nomor_surat';
+    const sort = searchParams.get('sort') || 'id';
+    const order = (searchParams.get('order') || 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '10', 10);
+
+    const offset = (page - 1) * limit;
+
+    // Validasi kolom yang boleh di-sort/filter
+    const allowedFields = ['nomor_surat', 'no_po', 'tujuan', 'keterangan_proyek', 'id', 'tanggal'];
+    const fieldSafe = allowedFields.includes(field) ? field : 'nomor_surat';
+    const sortSafe = allowedFields.includes(sort) ? sort : 'id';
+
+    // Filter query
+    let whereClause = '';
+    let params: any[] = [];
+    if (search) {
+      whereClause = `WHERE ${fieldSafe} LIKE ?`;
+      params.push(`%${search}%`);
+    }
+
+    // Hitung total data untuk pagination
+    const [countRows] = await db.query(
+      `SELECT COUNT(*) as total FROM surat_jalan ${whereClause}`,
+      params
+    ) as [RowDataPacket[], any];
+    const totalItems = countRows[0]?.total || 0;
+    const totalPages = Math.ceil(totalItems / limit) || 1;
+
+    // Query data
+    const [suratJalanRows] = await db.query(
+      `
+        SELECT sj.*, 
+        (SELECT COUNT(*) FROM surat_jalan_detail WHERE surat_jalan_id = sj.id) as jumlah_barang
+        FROM surat_jalan sj
+        ${whereClause}
+        ORDER BY sj.${sortSafe} ${order}
+        LIMIT ? OFFSET ?
+      `,
+      [...params, limit, offset]
+    ) as [QueryResultRow[], any];
+
     return NextResponse.json({
       success: true,
       data: suratJalanRows,
+      pagination: {
+        totalPages,
+        currentPage: page,
+        totalItems,
+      },
     });
   } catch (error) {
     console.error('Error fetching surat jalan:', error);

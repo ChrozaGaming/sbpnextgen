@@ -46,6 +46,7 @@ const formatTanggal = (tanggal: string): string => {
 
 const DataSuratJalan = () => {
   const [suratJalan, setSuratJalan] = useState<SuratJalan[]>([]);
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchField, setSearchField] = useState<'nomor_surat' | 'no_po' | 'tujuan' | 'keterangan_proyek'>('nomor_surat');
   const [sortField, setSortField] = useState<keyof SuratJalan>('id');
@@ -58,6 +59,15 @@ const DataSuratJalan = () => {
 
   const ITEMS_PER_PAGE = 10;
 
+  // Debounce pencarian
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearchQuery(searchInput);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchInput, searchField]);
+
   useEffect(() => {
     const fetchSuratJalan = async () => {
       try {
@@ -66,15 +76,12 @@ const DataSuratJalan = () => {
           `/api/suratjalan?search=${searchQuery}&field=${searchField}&sort=${sortField}&order=${sortOrder}&page=${currentPage}&limit=${ITEMS_PER_PAGE}`
         );
         if (!response.ok) throw new Error('Gagal mengambil data surat jalan');
-
         const data: ApiResponse = await response.json();
         if (data.success) {
           setSuratJalan(data.data || []);
-          // Safely handle pagination data
           if (data.pagination && typeof data.pagination.totalPages === 'number') {
             setTotalPages(data.pagination.totalPages);
           } else {
-            // Fallback: calculate total pages if pagination data is missing
             const totalItems = data.data.length;
             const calculatedTotalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
             setTotalPages(calculatedTotalPages);
@@ -85,13 +92,11 @@ const DataSuratJalan = () => {
         }
       } catch (err: any) {
         setError(err.message);
-        // Ensure we have at least one page even on error
         setTotalPages(1);
       } finally {
         setLoading(false);
       }
     };
-
     fetchSuratJalan();
   }, [searchQuery, searchField, sortField, sortOrder, currentPage]);
 
@@ -110,33 +115,18 @@ const DataSuratJalan = () => {
   const handlePrintPDF = async (item: SuratJalan) => {
     try {
       setLoadingPDF(item.id);
-      
-      // Ambil detail lengkap dari surat jalan 
       const response = await fetch(`/api/suratjalan/${item.id}`);
-      if (!response.ok) {
-        throw new Error('Gagal mengambil detail surat jalan');
-      }
-      
+      if (!response.ok) throw new Error('Gagal mengambil detail surat jalan');
       const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Terjadi kesalahan saat mengambil detail');
-      }
-      
+      if (!data.success) throw new Error(data.message || 'Terjadi kesalahan saat mengambil detail');
       const detailData = data.data;
-      
-      // Validasi data barang
       if (!detailData.barang || !Array.isArray(detailData.barang) || detailData.barang.length === 0) {
         throw new Error('Tidak ada data barang pada surat jalan ini');
       }
-      
       if (detailData.barang.some((b: BarangDetail) => !b.kode || !b.nama || !b.jumlah || !b.satuan)) {
         throw new Error('Data barang tidak lengkap (kode, nama, jumlah, atau satuan kosong)');
       }
-      
-      // Generate PDF
       await generatePDF(detailData);
-      
     } catch (err: any) {
       alert(`Gagal mencetak PDF: ${err.message}`);
       console.error('Error printing PDF:', err);
@@ -144,6 +134,21 @@ const DataSuratJalan = () => {
       setLoadingPDF(null);
     }
   };
+
+  const sortedSuratJalan = [...suratJalan].sort((a, b) => {
+    const fieldA = a[sortField];
+    const fieldB = b[sortField];
+    if (fieldA === null || fieldB === null) return 0;
+    if (typeof fieldA === 'string' && typeof fieldB === 'string') {
+      return sortOrder === 'asc'
+        ? fieldA.localeCompare(fieldB)
+        : fieldB.localeCompare(fieldA);
+    }
+    if (typeof fieldA === 'number' && typeof fieldB === 'number') {
+      return sortOrder === 'asc' ? fieldA - fieldB : fieldB - fieldA;
+    }
+    return 0;
+  });
 
   if (loading) {
     return (
@@ -176,7 +181,10 @@ const DataSuratJalan = () => {
       <div className="mb-4 flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
         <select
           value={searchField}
-          onChange={(e) => setSearchField(e.target.value as any)}
+          onChange={e => {
+            setSearchField(e.target.value as any);
+            setSearchInput('');
+          }}
           className="w-full sm:w-auto border rounded-md p-2"
         >
           <option value="nomor_surat">Nomor Surat</option>
@@ -186,13 +194,13 @@ const DataSuratJalan = () => {
         </select>
         <input
           type="text"
-          placeholder={`Cari berdasarkan ${searchField}`}
+          placeholder={`Cari berdasarkan ${searchField.replace('_', ' ')}`}
           className="w-full flex-1 border rounded-md p-2"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
         />
       </div>
-      {suratJalan.length > 0 ? (
+      {sortedSuratJalan.length > 0 ? (
         <div className="overflow-x-auto border rounded-lg">
           <table className="w-full border-collapse">
             <thead>
@@ -216,7 +224,7 @@ const DataSuratJalan = () => {
               </tr>
             </thead>
             <tbody>
-              {suratJalan.map((item, index) => (
+              {sortedSuratJalan.map((item, index) => (
                 <tr key={item.id} className="text-center hover:bg-gray-50">
                   <td className="px-4 py-2 border-b">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
                   <td className="px-4 py-2 border-b">{item.nomor_surat}</td>
@@ -256,22 +264,21 @@ const DataSuratJalan = () => {
           Previous
         </button>
         <span className="font-medium">
-  Halaman {currentPage} dari {totalPages}
-</span>
-<button
-  onClick={() => handlePageChange(currentPage + 1)}
-  disabled={currentPage === totalPages}
-  className={`px-4 py-2 border rounded-md ${
-    currentPage === totalPages 
-      ? 'text-gray-400 cursor-not-allowed' 
-      : 'text-blue-500 hover:bg-blue-50'
-  }`}
->
-  Next
-</button>
+          Halaman {currentPage} dari {totalPages}
+        </span>
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={`px-4 py-2 border rounded-md ${
+            currentPage === totalPages
+              ? 'text-gray-400 cursor-not-allowed'
+              : 'text-blue-500 hover:bg-blue-50'
+          }`}
+        >
+          Next
+        </button>
       </div>
-      
-      {/* Tombol Kembali ke Dashboard */}
+
       <div className="mt-6 flex justify-center">
         <a 
           href="/dashboard" 
@@ -285,4 +292,3 @@ const DataSuratJalan = () => {
 };
 
 export default DataSuratJalan;
-

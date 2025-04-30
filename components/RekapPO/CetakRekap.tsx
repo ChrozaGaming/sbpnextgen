@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -5,14 +6,14 @@ import { MultiSelect } from 'react-multi-select-component';
 import { generateDocDefinition, RekapPO } from '@/utils/pdfGenerator';
 import dynamic from 'next/dynamic';
 
-const PDFGenerator = dynamic(() => import('./PDFGenerator'), {
+const PDFGenerator = dynamic(() => import('../PDFGenerator'), {
     ssr: false,
     loading: () => <p>Loading PDF generator...</p>
 });
 
-interface CompanyOption {
-    label: string;
-    value: string;
+import type { IOption } from 'react-multi-select-component';
+
+interface CompanyOption extends IOption {
     records: RekapPO[];
 }
 
@@ -187,7 +188,7 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data }) => {
                         <MultiSelect
                             options={companies}
                             value={selected}
-                            onChange={handleCompanyChange}
+                            onChange={(opts) => handleCompanyChange(opts as CompanyOption[])}
                             labelledBy="Pilih Perusahaan"
                             className="min-w-[200px]"
                         />
@@ -278,7 +279,7 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data }) => {
                                         <table className="min-w-full bg-white border">
                                             <thead>
                                             <tr className="bg-gray-50">
-                                                <th className="px-4 py-2 w-10"></th>
+                                                <th className="px-4 py-2 w-10">Pilih</th>
                                                 <th className="px-4 py-2">No PO</th>
                                                 <th className="px-4 py-2">Judul PO</th>
                                                 <th className="px-4 py-2">Tanggal</th>

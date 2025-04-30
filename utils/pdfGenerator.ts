@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/prefer-as-const */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
-import { fonts } from './fonts';
 
 export interface RekapPO {
     id: number;
@@ -91,17 +93,16 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
         };
 
         // Modifikasi sorting untuk mengurutkan berdasarkan tanggal
-        const records = selectedRecords
-            .sort((a, b) => {
-                // Pertama urutkan berdasarkan nama perusahaan
-                const companyComparison = a.nama_perusahaan.localeCompare(b.nama_perusahaan);
-                if (companyComparison !== 0) return companyComparison;
+        const records = selectedRecords.toSorted((a, b) => {
+            // Pertama urutkan berdasarkan nama perusahaan
+            const companyComparison = a.nama_perusahaan.localeCompare(b.nama_perusahaan);
+            if (companyComparison !== 0) return companyComparison;
 
-                // Jika nama perusahaan sama, urutkan berdasarkan tanggal
-                const dateA = new Date(a.tanggal).getTime();
-                const dateB = new Date(b.tanggal).getTime();
-                return dateA - dateB; // Urutkan dari tanggal lama ke baru
-            });
+            // Jika nama perusahaan sama, urutkan berdasarkan tanggal
+            const dateA = new Date(a.tanggal).getTime();
+            const dateB = new Date(b.tanggal).getTime();
+            return dateA - dateB; // Urutkan dari tanggal lama ke baru
+        });
 
         const companyGroups = records.reduce((groups, record) => {
             const group = groups[record.nama_perusahaan] || [];
@@ -209,11 +210,11 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
                         ]
                     },
                     layout: {
-                        hLineWidth: (i, node) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
-                        vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length) ? 1 : 0.5,
-                        hLineColor: (i, node) => (i === 0 || i === node.table.body.length) ? 'black' : '#aaaaaa',
-                        vLineColor: (i, node) => (i === 0 || i === node.table.widths.length) ? 'black' : '#aaaaaa',
-                        fillColor: function(rowIndex, node, columnIndex) {
+                        hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+                        vLineWidth: (i: number, node: any) => (i === 0 || i === node.table.widths.length) ? 1 : 0.5,
+                        hLineColor: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 'black' : '#aaaaaa',
+                        vLineColor: (i: number, node: any) => (i === 0 || i === node.table.widths.length) ? 'black' : '#aaaaaa',
+                        fillColor: function(rowIndex: number, node: any, columnIndex: number) {
                             if (rowIndex === 0) return '#f3f4f6';
                             if (columnIndex === 3) {
                                 const record = companyRecords[rowIndex - 1];
@@ -221,10 +222,10 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
                             }
                             return null;
                         },
-                        paddingLeft: (i) => 4,
-                        paddingRight: (i) => 4,
-                        paddingTop: (i) => 3,
-                        paddingBottom: (i) => 3,
+                        paddingLeft: (i: number) => 4,
+                        paddingRight: (i: number) => 4,
+                        paddingTop: (i: number) => 3,
+                        paddingBottom: (i: number) => 3,
                     }
                 },
 
@@ -328,7 +329,7 @@ export const generateDocDefinition = (selectedRecords: RekapPO[]): TDocumentDefi
                 companyName: {
                     fontSize: 12,
                     bold: true,
-                    decoration: 'underline'
+                    italics: true
                 }
             },
             defaultStyle: {

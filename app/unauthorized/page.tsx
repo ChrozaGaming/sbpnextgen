@@ -1,108 +1,79 @@
-// app/unauthorized/page.tsx
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React from "react";
+import { useRouter } from "next/navigation";
 
 export default function UnauthorizedPage() {
-    const router = useRouter()
+  const router = useRouter();
 
-    useEffect(() => {
-        const clearAllCookiesAndRedirect = () => {
-            try {
-                // Hapus cookies dengan mengatur expired date ke masa lalu
-                const cookies = document.cookie.split(';')
+  // Function to go back to the previous page
+  const goBack = () => {
+    router.back();
+  };
 
-                for (let cookie of cookies) {
-                    const cookieName = cookie.split('=')[0].trim()
-                    // Hapus cookie dengan mengatur berbagai domain dan path
-                    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`
-                    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname};`
-                    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.${window.location.hostname};`
-                }
+  // Function to redirect to home page
+  const goToHome = () => {
+    router.push("/");
+  };
 
-                // Hapus data dari localStorage
-                localStorage.clear()
-
-                // Hapus data dari sessionStorage
-                sessionStorage.clear()
-
-                // Delay sebentar sebelum redirect untuk memastikan cookies terhapus
-                setTimeout(() => {
-                    router.push('/login')
-                }, 1500)
-
-            } catch (error) {
-                console.error('Error clearing cookies:', error)
-                // Redirect ke login meskipun terjadi error
-                router.push('/login')
-            }
-        }
-
-        clearAllCookiesAndRedirect()
-    }, [router])
-
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-            <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-                <div className="mb-6">
-                    <svg
-                        className="mx-auto h-16 w-16 text-red-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                    </svg>
-                </div>
-
-                <h1 className="text-2xl font-bold text-gray-800 mb-4">
-                    Akses Ditolak
-                </h1>
-
-                <p className="text-gray-600 mb-6">
-                    Maaf, Anda tidak memiliki izin untuk mengakses halaman ini.
-                    Anda akan dialihkan ke halaman login dalam beberapa detik.
-                </p>
-
-                <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                </div>
-
-                <div className="mt-6 text-sm text-gray-500">
-                    Menghapus sesi dan mengalihkan...
-                </div>
-            </div>
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="bg-red-600 px-6 py-4">
+          <h2 className="text-xl font-bold text-white">Access Denied</h2>
         </div>
-    )
-}
 
-// Tambahkan helper function untuk menghapus cookies (opsional)
-function deleteAllCookies() {
-    const cookies = document.cookie.split(';')
+        <div className="p-6">
+          <div className="flex justify-center mb-6">
+            <div className="h-24 w-24 rounded-full bg-red-100 flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-12 w-12 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-10v2m0 0v2m0-2h2m-2 0H9m9-6h.01M4 19.5h16a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H4A1.5 1.5 0 002.5 6v12A1.5 1.5 0 004 19.5z"
+                />
+              </svg>
+            </div>
+          </div>
 
-    for (let cookie of cookies) {
-        const cookieName = cookie.split('=')[0].trim()
-        const domain = window.location.hostname
+          <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">
+            Unauthorized Access
+          </h1>
 
-        // Hapus untuk root path
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`
+          <p className="text-gray-600 text-center mb-6">
+            You do not have permission to access this page. This feature is
+            restricted to users with speciality role only.
+          </p>
 
-        // Hapus untuk domain saat ini
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domain};`
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={goBack}
+              className="w-full py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition duration-200"
+            >
+              Go Back
+            </button>
 
-        // Hapus untuk subdomain
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.${domain};`
+            <button
+              onClick={goToHome}
+              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200"
+            >
+              Go to Home
+            </button>
+          </div>
+        </div>
+      </div>
 
-        // Hapus dengan secure flag
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; secure;`
-
-        // Hapus dengan httpOnly flag (meskipun JavaScript tidak bisa menghapus httpOnly cookies)
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; secure; httpOnly;`
-    }
+      <p className="mt-8 text-sm text-gray-500">
+        If you believe you should have access to this page, please contact your
+        system administrator.
+      </p>
+    </div>
+  );
 }

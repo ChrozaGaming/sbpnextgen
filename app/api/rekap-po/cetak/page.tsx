@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,6 +22,12 @@ interface RekapPO {
 interface CetakRekapProps {
     onClose: () => void;
     data?: RekapPO[];
+}
+
+interface CompanyOption {
+    label: string;
+    value: string;
+    records: RekapPO[];
 }
 
 const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data = [] }) => {
@@ -58,9 +66,13 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data = [] }) => {
         fetchData();
     }, []);
 
-    const handleChange = (selectedOptions: CompanyOption[]) => {
-        setSelected(selectedOptions);
-        const records = selectedOptions.flatMap(option => option.records);
+    const handleChange = (selectedOptions: any[]) => {
+        // Map selected generic options back to CompanyOption by matching value
+        const selectedCompanyOptions = companies.filter(company =>
+            selectedOptions.some((opt) => opt.value === company.value)
+        );
+        setSelected(selectedCompanyOptions);
+        const records = selectedCompanyOptions.flatMap(option => option.records);
         setSelectedRecords(records);
         setCheckedRecords(new Set());
     };
@@ -210,7 +222,9 @@ const CetakRekap: React.FC<CetakRekapProps> = ({ onClose, data = [] }) => {
                                             <table className="min-w-full divide-y divide-gray-200">
                                                 <thead className="bg-gray-50">
                                                 <tr>
-                                                    <th className="w-10 px-4 py-3"></th>
+                                                    <th className="w-10 px-4 py-3" scope="col">
+                                                        <span className="sr-only">Pilih</span>
+                                                    </th>
                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No PO</th>
                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Judul PO</th>
                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>

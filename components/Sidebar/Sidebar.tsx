@@ -1,11 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 'use client';
 
 import { useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { FaBars, FaTimes, FaWarehouse, FaClipboardList, FaFileAlt } from 'react-icons/fa'; // Icon untuk Surat PO menggunakan FaFileAlt
-import { BiScan } from 'react-icons/bi'; // Icon untuk Register Face
+import { FaBars, FaTimes, FaWarehouse, FaClipboardList, FaFileAlt } from 'react-icons/fa';
 import styles from './Sidebar.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -16,27 +15,54 @@ interface SidebarProps {
   setIsOpen: (isOpen: boolean) => void;
 }
 
+function clearAllCookies() {
+  if (typeof document === 'undefined') return;
+  const cookies = document.cookie ? document.cookie.split(';') : [];
+  for (const cookie of cookies) {
+    const eqPos = cookie.indexOf('=');
+    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;`;
+  }
+}
+
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
   const pathname = usePathname();
-  const { user, isAuthenticated, logout } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
+  const isAuthenticated = !!user;
+  const logout = auth?.logout || (() => {});
+
+  // Debugging output
+  console.debug('[Sidebar] pathname:', pathname);
+  console.debug('[Sidebar] user:', user);
+  console.debug('[Sidebar] isAuthenticated:', isAuthenticated);
+  console.debug('[Sidebar] NO_SIDEBAR_ROUTES:', NO_SIDEBAR_ROUTES);
 
   const handleLogout = () => {
     try {
-      logout();
-      setIsOpen(false); // Tutup sidebar setelah logout
+      console.debug('[Sidebar] Logging out...');
+      clearAllCookies();
+      logout && logout();
+      setIsOpen(false);
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[Sidebar] Logout error:', error);
     }
   };
 
   const shouldHideSidebar = useCallback(() => {
-    return (
+    const shouldHide =
       !isAuthenticated ||
-      (pathname && NO_SIDEBAR_ROUTES.includes(pathname as any))
-    );
+      (pathname && NO_SIDEBAR_ROUTES.includes(pathname as any));
+    console.debug('[Sidebar] shouldHideSidebar:', shouldHide, {
+      isAuthenticated,
+      pathname,
+      NO_SIDEBAR_ROUTES,
+    });
+    return shouldHide;
   }, [isAuthenticated, pathname]);
 
   if (shouldHideSidebar()) {
+    console.debug('[Sidebar] Sidebar hidden');
     return null;
   }
 
@@ -78,7 +104,6 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
               <span>Stok Gudang</span>
             </Link>
           </li>
-          {/* Menu Surat PO - ditambahkan sebelum Rekap PO */}
           <li>
             <Link
               href="/suratpo"
@@ -127,7 +152,10 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
       </div>
       <button
         className={styles.toggleButton}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          console.debug('[Sidebar] Toggle sidebar:', !isOpen);
+          setIsOpen(!isOpen);
+        }}
         type="button"
       >
         {isOpen ? <FaTimes /> : <FaBars />}

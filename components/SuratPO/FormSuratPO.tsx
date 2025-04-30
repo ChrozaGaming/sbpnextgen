@@ -1,355 +1,303 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { toast } from 'react-hot-toast';
 
-const formatRupiah = (value: number): string => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-    }).format(value);
+const unitOptions = [
+  'kg',
+  'kgset',
+  'pail',
+  'galon5liter',
+  'galon10liter',
+  'pcs',
+  'lonjor',
+  'liter',
+  'literset',
+  'sak',
+  'unit',
+];
+
+type Item = {
+  item_description: string;
+  item_code: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  amount: number;
 };
 
-interface Item {
-    item_description: string;
-    item_code: string;
-    quantity: number | string;
-    unit: string;
-    unit_price: number | string;
-    amount: number;
-}
+type FormData = {
+  po_number: string;
+  date: string;
+  supplier: string;
+  address: string;
+  attention: string;
+  note: string;
+  shipping_address: string;
+  bank: string;
+  account: string;
+  attention_pay_term: string;
+  order_by: string;
+  items: Item[];
+};
 
-interface FormData {
-    po_number: string;
-    date: string;
-    supplier: string;
-    address: string;
-    attention: string;
-    note: string;
-    shipping_address: string;
-    items: Item[];
-}
+type FormSuratPOProps = {
+  readonly onSubmitSuccess?: () => void;
+};
 
-const FormSuratPO: React.FC = () => {
-    const [formData, setFormData] = useState<FormData>({
+export default function FormSuratPO({ onSubmitSuccess }: FormSuratPOProps) {
+  const [formData, setFormData] = useState<FormData>({
+    po_number: '',
+    date: new Date().toISOString().slice(0, 10),
+    supplier: '',
+    address: '',
+    attention: '',
+    note: '',
+    shipping_address: '',
+    bank: '',
+    account: '',
+    attention_pay_term: '',
+    order_by: '',
+    items: [
+      {
+        item_description: '',
+        item_code: '',
+        quantity: 1,
+        unit: 'pcs',
+        unit_price: 0,
+        amount: 0,
+      },
+    ],
+  });
+
+  const [loading, setLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleItemChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ): void => {
+    const { name, value } = e.target;
+    const newItems = [...formData.items];
+
+    if (name === 'quantity' || name === 'unit_price') {
+      // Jika input dikosongkan, simpan 0 supaya perhitungan tetap aman
+      const numeric = value === '' ? 0 : parseFloat(value);
+      newItems[index][name as 'quantity' | 'unit_price'] = numeric;
+      // Re-hitung amount
+      newItems[index].amount = newItems[index].quantity * newItems[index].unit_price;
+    } else if (name === 'amount') {
+      newItems[index].amount = value === '' ? 0 : parseFloat(value);
+    } else {
+      newItems[index][name as keyof Item] = value as never;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      items: newItems,
+    }));
+  };
+
+  const addItem = (): void => {
+    setFormData((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { item_description: '', item_code: '', quantity: 1, unit: 'pcs', unit_price: 0, amount: 0 },
+      ],
+    }));
+  };
+
+  const removeItem = (index: number): void => {
+    if (formData.items.length === 1) {
+      toast.error('Minimal harus ada 1 item');
+      return;
+    }
+    const newItems = [...formData.items];
+    newItems.splice(index, 1);
+    setFormData((prev) => ({
+      ...prev,
+      items: newItems,
+    }));
+  };
+
+  const getSubtotal = (): number =>
+    formData.items.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+  const getTax = (): number => getSubtotal() * 0.11;
+
+  const getGrandTotal = (): number => getSubtotal() + getTax();
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await fetch('/api/suratpo/formsuratpo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message ?? 'Gagal menyimpan Purchase Order');
+      }
+
+      toast.success('Purchase Order berhasil disimpan!');
+      if (formRef.current) formRef.current.reset();
+
+      setFormData({
         po_number: '',
-        date: '',
+        date: new Date().toISOString().slice(0, 10),
         supplier: '',
         address: '',
         attention: '',
         note: '',
         shipping_address: '',
-        items: [{ item_description: '', item_code: '', quantity: '', unit: '', unit_price: '', amount: 0 }],
-    });
+        bank: '',
+        account: '',
+        attention_pay_term: '',
+        order_by: '',
+        items: [
+          {
+            item_description: '',
+            item_code: '',
+            quantity: 1,
+            unit: 'pcs',
+            unit_price: 0,
+            amount: 0,
+          },
+        ],
+      });
 
-    const handleFieldChange = (field: keyof FormData, value: string | Item[]) => {
-        setFormData({ ...formData, [field]: value });
-    };
+      if (onSubmitSuccess) onSubmitSuccess();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan data';
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleItemChange = (index: number, field: keyof Item, value: string | number) => {
-        const updatedItems = [...formData.items];
-        updatedItems[index][field] = value;
+  return (
+    <form ref={formRef} onSubmit={handleSubmit} className="bg-white shadow-md rounded p-6">
+      {/* --- form header fields dihilangkan untuk ringkas --- */}
 
-        if (field === 'quantity' || field === 'unit_price') {
-            const quantity = Number(updatedItems[index].quantity) || 0;
-            const unitPrice = Number(updatedItems[index].unit_price) || 0;
-            updatedItems[index].amount = quantity * unitPrice;
-        }
-
-        setFormData({ ...formData, items: updatedItems });
-    };
-
-    const handleAddItem = () => {
-        setFormData({
-            ...formData,
-            items: [
-                ...formData.items,
-                { item_description: '', item_code: '', quantity: '', unit: '', unit_price: '', amount: 0 },
-            ],
-        });
-    };
-
-    const handleRemoveItem = (index: number) => {
-        const updatedItems = formData.items.filter((_, i) => i !== index);
-        setFormData({ ...formData, items: updatedItems });
-    };
-
-    const calculateTotal = () => {
-        return formData.items.reduce((total, item) => total + item.amount, 0);
-    };
-
-    const subTotal = calculateTotal();
-    const tax = subTotal * 0.11;
-    const grandTotal = subTotal + tax;
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        try {
-            const response = await fetch('/api/suratpo/formsuratpo', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            });
-
-            if (response.ok) {
-                alert('Data saved successfully!');
-                setFormData({
-                    po_number: '',
-                    date: '',
-                    supplier: '',
-                    address: '',
-                    attention: '',
-                    note: '',
-                    shipping_address: '',
-                    items: [{ item_description: '', item_code: '', quantity: '', unit: '', unit_price: '', amount: 0 }],
-                });
-            } else {
-                alert('Failed to save data');
-            }
-        } catch (error) {
-            console.error('Error saving data:', error);
-        }
-    };
-
-    return (
-        <div className="max-w-5xl mx-auto p-6 bg-white shadow-md rounded-lg">
-            <h1 className="text-2xl font-semibold mb-4">Purchase Order Form</h1>
-            <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label className="block text-sm font-medium mb-2">PO Number</label>
-                        <input
-                            type="text"
-                            value={formData.po_number}
-                            onChange={(e) => handleFieldChange('po_number', e.target.value)}
-                            className="w-full border rounded-md p-2"
-                            placeholder="PO Number"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Date</label>
-                        <input
-                            type="date"
-                            value={formData.date}
-                            onChange={(e) => handleFieldChange('date', e.target.value)}
-                            className="w-full border rounded-md p-2"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Supplier</label>
-                        <input
-                            type="text"
-                            value={formData.supplier}
-                            onChange={(e) => handleFieldChange('supplier', e.target.value)}
-                            className="w-full border rounded-md p-2"
-                            placeholder="Supplier"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Address</label>
-                        <textarea
-                            value={formData.address}
-                            onChange={(e) => handleFieldChange('address', e.target.value)}
-                            className="w-full border rounded-md p-2"
-                            placeholder="Supplier Address"
-                            required
-                        ></textarea>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Attention</label>
-                        <input
-                            type="text"
-                            value={formData.attention}
-                            onChange={(e) => handleFieldChange('attention', e.target.value)}
-                            className="w-full border rounded-md p-2"
-                            placeholder="Attention"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Shipping Address</label>
-                        <textarea
-                            value={formData.shipping_address}
-                            onChange={(e) => handleFieldChange('shipping_address', e.target.value)}
-                            className="w-full border rounded-md p-2"
-                            placeholder="Shipping Address"
-                            required
-                        ></textarea>
-                    </div>
-                    <div className="col-span-2">
-                        <label className="block text-sm font-medium mb-2">Note</label>
-                        <textarea
-                            value={formData.note}
-                            onChange={(e) => handleFieldChange('note', e.target.value)}
-                            className="w-full border rounded-md p-2"
-                            placeholder="Note"
-                        ></textarea>
-                    </div>
-                </div>
-                <h2 className="text-lg font-semibold mb-4">Items</h2>
-                {formData.items.map((item, index) => (
-                    <div key={index} className={`p-4 mb-4 rounded-md shadow-sm ${index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-50'}`}>
-                        <h3 className="font-semibold mb-4">Items {index + 1}:</h3>
-                        <div className="grid grid-cols-4 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Item Description</label>
-                                <input
-                                    type="text"
-                                    value={item.item_description}
-                                    onChange={(e) => handleItemChange(index, 'item_description', e.target.value)}
-                                    className="w-full border rounded-md p-2"
-                                    placeholder="Description"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Item Code</label>
-                                <input
-                                    type="text"
-                                    value={item.item_code}
-                                    onChange={(e) => handleItemChange(index, 'item_code', e.target.value)}
-                                    className="w-full border rounded-md p-2"
-                                    placeholder="Code"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Quantity</label>
-                                <input
-                                    type="text"
-                                    value={item.quantity}
-                                    onChange={(e) =>
-                                        handleItemChange(index, 'quantity', e.target.value.replace(/[^0-9]/g, ''))
-                                    }
-                                    onFocus={(e) => e.target.select()}
-                                    className="w-full border rounded-md p-2"
-                                    placeholder="0"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Unit</label>
-                                <select
-                                    value={item.unit}
-                                    onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                                    className="w-full border rounded-md p-2"
-                                    required
-                                >
-                                    <option value="">Select Unit</option>
-                                    <option value="kg">kg</option>
-                                    <option value="kgset">kgset</option>
-                                    <option value="pail">pail</option>
-                                    <option value="galon5liter">galon5liter</option>
-                                    <option value="galon10liter">galon10liter</option>
-                                    <option value="pcs">pcs</option>
-                                    <option value="lonjor">lonjor</option>
-                                    <option value="liter">liter</option>
-                                    <option value="literset">literset</option>
-                                    <option value="sak">sak</option>
-                                    <option value="unit">unit</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Unit Price (Rp.)</label>
-                                <input
-                                    type="text"
-                                    value={
-                                        item.unit_price === ''
-                                            ? ''
-                                            : typeof item.unit_price === 'number'
-                                                ? formatRupiah(item.unit_price)
-                                                : item.unit_price
-                                    }
-                                    onChange={(e) =>
-                                        handleItemChange(index, 'unit_price', Number(e.target.value.replace(/[^0-9]/g, '')))
-                                    }
-                                    onFocus={(e) => e.target.select()}
-                                    className="w-full border rounded-md p-2"
-                                    placeholder="Rp."
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Amount</label>
-                                <input
-                                    type="text"
-                                    value={formatRupiah(item.amount)}
-                                    readOnly
-                                    className="w-full border rounded-md p-2 bg-gray-200 cursor-not-allowed"
-                                />
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => handleRemoveItem(index)}
-                            className="mt-4 text-red-500 hover:underline"
-                        >
-                            Remove Item
-                        </button>
-                    </div>
-                ))}
-                <button
+      <h3 className="text-lg font-bold mt-6 mb-3">Detail Item</h3>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="w-1/3 py-2 px-4 border">Deskripsi Item</th>
+              <th className="w-1/6 py-2 px-4 border">Kode Item</th>
+              <th className="w-1/12 py-2 px-4 border">Jumlah</th>
+              <th className="w-1/12 py-2 px-4 border">Satuan</th>
+              <th className="w-1/6 py-2 px-4 border">Harga Satuan</th>
+              <th className="w-1/6 py-2 px-4 border">Total</th>
+              <th className="w-1/12 py-2 px-4 border">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {formData.items.map((item, index) => (
+              <tr key={`item-${index}`}>
+                <td className="py-2 px-4 border">
+                  <input
+                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                    name="item_description"
+                    value={item.item_description}
+                    onChange={(e) => handleItemChange(index, e)}
+                    required
+                  />
+                </td>
+                <td className="py-2 px-4 border">
+                  <input
+                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                    name="item_code"
+                    value={item.item_code}
+                    onChange={(e) => handleItemChange(index, e)}
+                    required
+                  />
+                </td>
+                <td className="py-2 px-4 border">
+                  <input
+                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                    type="number"
+                    min="1"
+                    name="quantity"
+                    value={item.quantity === 0 ? '' : item.quantity}
+                    onChange={(e) => handleItemChange(index, e)}
+                    required
+                  />
+                </td>
+                <td className="py-2 px-4 border">
+                  <select
+                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                    name="unit"
+                    value={item.unit}
+                    onChange={(e) => handleItemChange(index, e)}
+                    required
+                  >
+                    {unitOptions.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {unit}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2 px-4 border">
+                  <input
+                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                    type="number"
+                    min="0"
+                    name="unit_price"
+                    value={item.unit_price === 0 ? '' : item.unit_price}
+                    onChange={(e) => handleItemChange(index, e)}
+                    required
+                  />
+                </td>
+                <td className="py-2 px-4 border font-medium">
+                  {new Intl.NumberFormat('id-ID', {
+                    style: 'currency',
+                    currency: 'IDR',
+                    minimumFractionDigits: 0,
+                  }).format(item.amount)}
+                </td>
+                <td className="py-2 px-4 border">
+                  <button
                     type="button"
-                    onClick={handleAddItem}
-                    className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition mb-4"
-                >
-                    Add Item
-                </button>
-                <div className="border-t border-gray-300 pt-4">
-                    <h2 className="text-lg font-semibold mb-4">Rincian Perhitungan</h2>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Total Amount</label>
-                            <input
-                                type="text"
-                                value={formatRupiah(subTotal)}
-                                readOnly
-                                className="w-full border rounded-md p-2 bg-gray-200 cursor-not-allowed"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Sub Total</label>
-                            <input
-                                type="text"
-                                value={formatRupiah(subTotal)}
-                                readOnly
-                                className="w-full border rounded-md p-2 bg-gray-200 cursor-not-allowed"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-2">PPN 11%</label>
-                            <input
-                                type="text"
-                                value={formatRupiah(tax)}
-                                readOnly
-                                className="w-full border rounded-md p-2 bg-orange-200 cursor-not-allowed"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Grand Total</label>
-                            <input
-                                type="text"
-                                value={formatRupiah(grandTotal)}
-                                readOnly
-                                className="w-full border rounded-md p-2 bg-gray-200 cursor-not-allowed"
-                            />
-                        </div>
-                    </div>
-                </div>
-                <button
-                    type="submit"
-                    className="w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition mt-4"
-                >
-                    Save Purchase Order
-                </button>
-            </form>
-        </div>
-    );
-};
+                    className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded"
+                    onClick={() => removeItem(index)}
+                  >
+                    Hapus
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {/* footer subtotal/tax/total dihilangkan demi ringkas */}
+        </table>
+      </div>
 
-export default FormSuratPO;
+      <div className="flex items-center justify-center mt-6">
+        <button
+          className={`bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ${
+            loading ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          type="submit"
+          disabled={loading}
+        >
+          {loading ? 'Menyimpan...' : 'Simpan Purchase Order'}
+        </button>
+      </div>
+    </form>
+  );
+}
