@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useCallback } from 'react';
@@ -100,23 +101,6 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                 {user?.role === 'superadmin' && (
                   <span className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded-full">
                     Superadmin
-                  </span>
-                )}
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/registerfacerecognition"
-              onClick={() => setIsOpen(false)}
-              className={`${styles.menuItem} ${pathname === '/registerfacerecognition' ? styles.active : ''}`}
-            >
-              <BiScan className="text-xl" />
-              <span className="flex items-center">
-                Register Face
-                {!user?.hasFaceRegistration && (
-                  <span className="ml-2 px-2 py-1 text-xs bg-red-500 text-white rounded-full">
-                    Required
                   </span>
                 )}
               </span>

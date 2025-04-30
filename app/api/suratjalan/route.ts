@@ -1,188 +1,206 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db'; // File koneksi database
+import { db } from '@/lib/db';
+import { RowDataPacket, OkPacket, ResultSetHeader } from 'mysql2';
+
+// Definisi tipe untuk hasil query
+type QueryResultRow = RowDataPacket & {
+  id: number;
+  tujuan: string;
+  nomor_surat: string;
+  tanggal: string;
+  // tambahkan properti lain sesuai kebutuhan
+};
+
+export async function GET() {
+  try {
+    const [suratJalanRows] = await db.query(`
+      SELECT sj.*, 
+      (SELECT COUNT(*) FROM surat_jalan_detail WHERE surat_jalan_id = sj.id) as jumlah_barang
+      FROM surat_jalan sj
+      ORDER BY sj.tanggal DESC
+    `) as [QueryResultRow[], any];
+
+    // Gunakan tipe spesifik untuk hasil query
+    return NextResponse.json({
+      success: true,
+      data: suratJalanRows,
+    });
+  } catch (error) {
+    console.error('Error fetching surat jalan:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Terjadi kesalahan saat mengambil data surat jalan',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: Request) {
-    try {
-        // Ambil data dari body request
-        const body = await request.json();
-        const { tujuan, nomorSurat, tanggal, nomorKendaraan, noPo, barang, keteranganProyek } = body;
+  try {
+    // Ambil data dari body request
+    const body = await request.json();
+    const { tujuan, nomorSurat, tanggal, nomorKendaraan, noPo, barang, keteranganProyek } = body;
 
-        // Validasi data input
-        if (!tujuan || !nomorSurat || !tanggal || !Array.isArray(barang) || barang.length === 0) {
-            return NextResponse.json(
-                { success: false, message: 'Data surat jalan tidak lengkap' },
-                { status: 400 }
-            );
-        }
+    console.log("Received data:", { tujuan, nomorSurat, tanggal, barangLength: barang?.length });
 
-        // Mulai transaksi
-        await db.query('START TRANSACTION');
-
-        try {
-            // Simpan data surat jalan
-            const [suratJalanResult] = await db.query(
-                `
-                    INSERT INTO surat_jalan (tujuan, nomor_surat, tanggal, nomor_kendaraan, no_po, keterangan_proyek)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                `,
-                [tujuan, nomorSurat, tanggal, nomorKendaraan || null, noPo || null, keteranganProyek || null]
-            );
-
-            const suratJalanId = (suratJalanResult as any).insertId;
-
-            // Simpan data barang yang terkait dengan surat jalan
-            for (const item of barang) {
-                const { id, jumlah } = item;
-
-                // Validasi data barang
-                if (!id || !jumlah || jumlah <= 0) {
-                    throw new Error(`Data barang tidak valid: ${JSON.stringify(item)}`);
-                }
-
-                // Periksa apakah stok mencukupi
-                const [stokResult] = await db.query(
-                    'SELECT stok_sisa, satuan FROM stok WHERE id = ?',
-                    [id]
-                );
-
-                if (stokResult.length === 0) {
-                    throw new Error(`Barang dengan ID ${id} tidak ditemukan.`);
-                }
-
-                const stokSisa = stokResult[0].stok_sisa;
-                if (stokSisa < jumlah) {
-                    return NextResponse.json(
-                        {
-                            success: false,
-                            message: `Stok barang dengan ID ${id} tidak mencukupi. Sisa stok: ${stokSisa}`,
-                        },
-                        { status: 400 }
-                    );
-                }
-
-
-                // Masukkan data barang ke dalam tabel barang_surat_jalan
-                await db.query(
-                    `
-                        INSERT INTO barang_surat_jalan (surat_jalan_id, barang_id, jumlah)
-                        VALUES (?, ?, ?)
-                    `,
-                    [suratJalanId, id, jumlah]
-                );
-
-                // Kurangi stok barang di tabel stok
-                await db.query(
-                    `
-                        UPDATE stok
-                        SET stok_sisa = stok_sisa - ?, stok_keluar = stok_keluar + ?
-                        WHERE id = ?
-                    `,
-                    [jumlah, jumlah, id]
-                );
-            }
-
-            // Commit transaksi
-            await db.query('COMMIT');
-
-            return NextResponse.json({
-                success: true,
-                message: 'Surat Jalan berhasil disimpan',
-                suratJalanId,
-            });
-        } catch (error) {
-            // Rollback jika ada kesalahan
-            await db.query('ROLLBACK');
-            throw error;
-        }
-    } catch (error) {
-        console.error('Error processing surat jalan:', error);
-        return NextResponse.json(
-            {
-                success: false,
-                message: 'Terjadi kesalahan saat memproses surat jalan',
-                error: error instanceof Error ? error.message : 'Unknown error',
-            },
-            { status: 500 }
-        );
+    // Validasi data input
+    if (!tujuan || !nomorSurat || !tanggal || !Array.isArray(barang) || barang.length === 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: 'Data surat jalan tidak lengkap',
+          missing: {
+            tujuan: !tujuan,
+            nomorSurat: !nomorSurat,
+            tanggal: !tanggal,
+            barang: !Array.isArray(barang) || barang.length === 0
+          }
+        },
+        { status: 400 }
+      );
     }
+
+    // Mulai transaksi
+    await db.query('START TRANSACTION');
+
+    try {
+      // Simpan data surat jalan
+      const [suratJalanResult] = await db.query(
+        `
+          INSERT INTO surat_jalan (tujuan, nomor_surat, tanggal, nomor_kendaraan, no_po, keterangan_proyek)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+        [tujuan, nomorSurat, tanggal, nomorKendaraan ?? null, noPo ?? null, keteranganProyek ?? null]
+      ) as [ResultSetHeader, any];
+
+      const suratJalanId = suratJalanResult.insertId;
+
+      // Simpan data barang dan update stok
+      let noUrut = 1;
+      for (const item of barang) {
+        const { jumlah, satuan, berat, kode, nama } = item;
+
+        // Tambahkan detail surat jalan
+        await db.query(
+          `
+          INSERT INTO surat_jalan_detail (surat_jalan_id, no_urut, quantity, unit, weight, kode_barang, nama_barang)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          `,
+          [suratJalanId, noUrut++, jumlah, satuan, berat ?? null, kode, nama]
+        );
+
+        // Update stok - tambahkan stok_keluar dan kurangi stok_sisa
+        const [updateResult] = await db.query(
+          `
+          UPDATE stok 
+          SET 
+            stok_keluar = stok_keluar + ?, 
+            stok_sisa = stok_sisa - ?,
+            tanggal_keluar = CURRENT_DATE()
+          WHERE kode = ? AND stok_sisa >= ?
+          `,
+          [jumlah, jumlah, kode, jumlah]
+        ) as [ResultSetHeader, any];
+
+        // Periksa jika stok berhasil diperbarui
+        if (updateResult.affectedRows === 0) {
+          // Stok tidak cukup atau kode barang tidak ditemukan
+          throw new Error(`Stok tidak cukup atau kode barang ${kode} tidak ditemukan`);
+        }
+      }
+
+      await db.query('COMMIT');
+
+      return NextResponse.json({
+        success: true,
+        message: 'Surat Jalan berhasil disimpan dan stok berhasil diperbarui',
+        id: suratJalanId,
+      });
+    } catch (error) {
+      // Rollback jika ada kesalahan
+      await db.query('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error creating surat jalan:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Terjadi kesalahan saat menyimpan surat jalan',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
 }
 
-// Contoh handler GET di API backend
-export async function GET(request: Request) {
+export async function DELETE(request: Request) {
+  try {
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search') || '';
-    const field = searchParams.get('field') || 'nomor_surat';
-    const sort = searchParams.get('sort') || 'id';
-    const order = searchParams.get('order') || 'asc';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const offset = (page - 1) * limit;
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: 'ID surat jalan tidak ditemukan' },
+        { status: 400 }
+      );
+    }
+
+    // Mulai transaksi
+    await db.query('START TRANSACTION');
 
     try {
-        const [rows] = await db.query(
-            `
-            SELECT
-                sj.id,
-                sj.nomor_surat,
-                sj.tujuan,
-                sj.tanggal,
-                sj.nomor_kendaraan,
-                sj.no_po,
-                sj.keterangan_proyek,
-                sj.created_at,
-                IFNULL(
-                    JSON_ARRAYAGG(
-                        JSON_OBJECT(
-                            'kode', s.kode,
-                            'nama', s.nama,
-                            'jumlah', bsj.jumlah,
-                            'satuan', s.satuan
-                        )
-                    ),
-                    JSON_ARRAY()
-                ) AS barang
-            FROM
-                surat_jalan sj
-            LEFT JOIN
-                barang_surat_jalan bsj ON sj.id = bsj.surat_jalan_id
-            LEFT JOIN
-                stok s ON bsj.barang_id = s.id
-            WHERE
-                ${field} LIKE ?
-            GROUP BY
-                sj.id
-            ORDER BY
-                ${sort} ${order}
-            LIMIT ? OFFSET ?
-            `,
-            [`%${search}%`, limit, offset]
+      // Ambil detail surat jalan untuk memulihkan stok
+      const [details] = await db.query(
+        'SELECT kode_barang, quantity FROM surat_jalan_detail WHERE surat_jalan_id = ?', 
+        [id]
+      ) as [RowDataPacket[], any];
+
+      // Kembalikan stok untuk setiap barang
+      for (const detail of details) {
+        await db.query(
+          `
+          UPDATE stok 
+          SET 
+            stok_keluar = stok_keluar - ?, 
+            stok_sisa = stok_sisa + ?
+          WHERE kode = ?
+          `,
+          [detail.quantity, detail.quantity, detail.kode_barang]
         );
+      }
 
-        const [countResult] = await db.query(`
-            SELECT COUNT(*) as total
-            FROM surat_jalan sj
-            WHERE ${field} LIKE ?
-        `, [`%${search}%`]);
+      // Hapus detail surat jalan
+      await db.query('DELETE FROM surat_jalan_detail WHERE surat_jalan_id = ?', [id]);
+      
+      // Hapus surat jalan
+      await db.query('DELETE FROM surat_jalan WHERE id = ?', [id]);
 
-        const total = countResult[0].total || 0;
-        return NextResponse.json({
-            success: true,
-            data: rows,
-            pagination: {
-                total,
-                totalPages: Math.ceil(total / limit),
-                currentPage: page,
-                pageSize: limit,
-            },
-        });
+      await db.query('COMMIT');
+
+      return NextResponse.json({
+        success: true,
+        message: 'Surat Jalan berhasil dihapus dan stok dipulihkan',
+      });
     } catch (error) {
-        console.error('Error fetching surat jalan:', error);
-        return NextResponse.json(
-            { success: false, message: 'Gagal mengambil data surat jalan', error: error.message },
-            { status: 500 }
-        );
+      // Rollback jika ada kesalahan
+      await db.query('ROLLBACK');
+      throw error;
     }
+  } catch (error) {
+    console.error('Error deleting surat jalan:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Terjadi kesalahan saat menghapus surat jalan',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
 }
-
-
-

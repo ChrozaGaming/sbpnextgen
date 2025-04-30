@@ -1,10 +1,15 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react/no-unescaped-entities */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 import Select from 'react-select';
 
 interface TambahStokProps {
-    onSuccess?: () => void;
-}
+    onClose: () => void;
+    onSuccess: () => void;
+  }
 
 interface SubKategori {
     id: number;
@@ -18,7 +23,14 @@ interface SubKategori {
 
 type KeteranganType = 'pembelian' | 'returbarangproyek' | 'warehouse';
 
-const keteranganOptions = [
+interface KeteranganOption {
+    value: KeteranganType;
+    label: string;
+    disabled?: boolean;
+    description?: string;
+}
+
+const keteranganOptions: KeteranganOption[] = [
     { value: 'pembelian', label: 'Pembelian' },
     { value: 'returbarangproyek', label: 'Retur Barang Proyek' },
     {
@@ -27,9 +39,9 @@ const keteranganOptions = [
         disabled: true,
         description: '(Coming Soon)'
     },
-] as const;
+];
 
-const TambahStok: React.FC<TambahStokProps> = ({ onSuccess }) => {
+const TambahStok: React.FC<TambahStokProps> = ({ onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         kode: '',
         nama: '',
