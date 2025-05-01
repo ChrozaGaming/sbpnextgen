@@ -13,7 +13,7 @@ export default function UnauthorizedPage() {
 
   // Function to redirect to home page
   const goToHome = () => {
-    router.push("/");
+    router.push("/login");
   };
 
   return (
@@ -64,7 +64,7 @@ export default function UnauthorizedPage() {
               onClick={goToHome}
               className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200"
             >
-              Go to Home
+              Go to Login
             </button>
           </div>
         </div>

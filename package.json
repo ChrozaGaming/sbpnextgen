@@ -51,7 +51,7 @@
     "react-multi-select-component": "^4.3.4",
     "react-select": "^5.9.0",
     "react-toastify": "^10.0.6",
-    "sweetalert2": "^11.15.2",
+    "sweetalert2": "^11.19.1",
     "swr": "^2.3.0",
     "tailwind-merge": "^2.5.5",
     "uuid": "^11.0.3"
