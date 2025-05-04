@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
 const unitOptions = [
@@ -74,9 +74,24 @@ export default function FormSuratPO({ onSubmitSuccess }: FormSuratPOProps) {
   const [loading, setLoading] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+  // Update amount when quantity or unit_price changes
+  useEffect(() => {
+    const updatedItems = formData.items.map(item => ({
+      ...item,
+      amount: item.quantity * item.unit_price
+    }));
+    
+    if (JSON.stringify(updatedItems) !== JSON.stringify(formData.items)) {
+      setFormData(prev => ({
+        ...prev,
+        items: updatedItems
+      }));
+    }
+  }, [formData.items]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       [name]: value,
     }));
@@ -87,32 +102,46 @@ export default function FormSuratPO({ onSubmitSuccess }: FormSuratPOProps) {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ): void => {
     const { name, value } = e.target;
-    const newItems = [...formData.items];
-
+    const updatedItems = [...formData.items];
+    
+    // Convert string values to number where appropriate
     if (name === 'quantity' || name === 'unit_price') {
-      // Jika input dikosongkan, simpan 0 supaya perhitungan tetap aman
-      const numeric = value === '' ? 0 : parseFloat(value);
-      newItems[index][name as 'quantity' | 'unit_price'] = numeric;
-      // Re-hitung amount
-      newItems[index].amount = newItems[index].quantity * newItems[index].unit_price;
-    } else if (name === 'amount') {
-      newItems[index].amount = value === '' ? 0 : parseFloat(value);
+      updatedItems[index] = {
+        ...updatedItems[index],
+        [name]: parseFloat(value) || 0,
+      };
     } else {
-      newItems[index][name as keyof Item] = value as never;
+      updatedItems[index] = {
+        ...updatedItems[index],
+        [name]: value,
+      };
     }
-
-    setFormData((prev) => ({
+    
+    // Update amount
+    if (name === 'quantity' || name === 'unit_price') {
+      updatedItems[index].amount = 
+        updatedItems[index].quantity * updatedItems[index].unit_price;
+    }
+    
+    setFormData(prev => ({
       ...prev,
-      items: newItems,
+      items: updatedItems,
     }));
   };
 
   const addItem = (): void => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       items: [
         ...prev.items,
-        { item_description: '', item_code: '', quantity: 1, unit: 'pcs', unit_price: 0, amount: 0 },
+        {
+          item_description: '',
+          item_code: '',
+          quantity: 1,
+          unit: 'pcs',
+          unit_price: 0,
+          amount: 0,
+        },
       ],
     }));
   };
@@ -122,39 +151,72 @@ export default function FormSuratPO({ onSubmitSuccess }: FormSuratPOProps) {
       toast.error('Minimal harus ada 1 item');
       return;
     }
-    const newItems = [...formData.items];
-    newItems.splice(index, 1);
-    setFormData((prev) => ({
+    
+    const updatedItems = [...formData.items];
+    updatedItems.splice(index, 1);
+    
+    setFormData(prev => ({
       ...prev,
-      items: newItems,
+      items: updatedItems,
     }));
   };
 
-  const getSubtotal = (): number =>
-    formData.items.reduce((sum, item) => sum + (item.amount || 0), 0);
-
-  const getTax = (): number => getSubtotal() * 0.11;
-
-  const getGrandTotal = (): number => getSubtotal() + getTax();
+  const calculateTotal = (): number => {
+    return formData.items.reduce((total, item) => total + item.amount, 0);
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
+    
+    // Validasi field wajib di client
+    if (
+      !formData.po_number ||
+      !formData.supplier ||
+      !formData.address ||
+      !formData.shipping_address ||
+      !formData.order_by
+    ) {
+      toast.error('Harap lengkapi semua field yang diperlukan');
+      return;
+    }
+    
+    // Validasi items
+    for (const item of formData.items) {
+      if (!item.item_description || !item.item_code) {
+        toast.error('Harap lengkapi semua detail item');
+        return;
+      }
+      
+      if (item.quantity <= 0 || item.unit_price < 0) {
+        toast.error('Quantity harus lebih dari 0 dan harga tidak boleh negatif');
+        return;
+      }
+    }
+    
     setLoading(true);
+    
     try {
       const response = await fetch('/api/suratpo/formsuratpo', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(formData),
       });
-
+      
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message ?? 'Gagal menyimpan Purchase Order');
+        throw new Error(data.message || 'Terjadi kesalahan saat menyimpan data');
       }
-
-      toast.success('Purchase Order berhasil disimpan!');
-      if (formRef.current) formRef.current.reset();
-
+      
+      toast.success('Purchase Order berhasil disimpan');
+      
+      if (onSubmitSuccess) {
+        onSubmitSuccess();
+      }
+      
+      // Reset form
       setFormData({
         po_number: '',
         date: new Date().toISOString().slice(0, 10),
@@ -178,126 +240,336 @@ export default function FormSuratPO({ onSubmitSuccess }: FormSuratPOProps) {
           },
         ],
       });
-
-      if (onSubmitSuccess) onSubmitSuccess();
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan data';
-      toast.error(msg);
+      
+    } catch (error: any) {
+      toast.error(error.message || 'Terjadi kesalahan saat menyimpan data');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="bg-white shadow-md rounded p-6">
-      {/* --- form header fields dihilangkan untuk ringkas --- */}
-
-      <h3 className="text-lg font-bold mt-6 mb-3">Detail Item</h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="w-1/3 py-2 px-4 border">Deskripsi Item</th>
-              <th className="w-1/6 py-2 px-4 border">Kode Item</th>
-              <th className="w-1/12 py-2 px-4 border">Jumlah</th>
-              <th className="w-1/12 py-2 px-4 border">Satuan</th>
-              <th className="w-1/6 py-2 px-4 border">Harga Satuan</th>
-              <th className="w-1/6 py-2 px-4 border">Total</th>
-              <th className="w-1/12 py-2 px-4 border">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formData.items.map((item, index) => (
-              <tr key={`item-${index}`}>
-                <td className="py-2 px-4 border">
-                  <input
-                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
-                    name="item_description"
-                    value={item.item_description}
-                    onChange={(e) => handleItemChange(index, e)}
-                    required
-                  />
-                </td>
-                <td className="py-2 px-4 border">
-                  <input
-                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
-                    name="item_code"
-                    value={item.item_code}
-                    onChange={(e) => handleItemChange(index, e)}
-                    required
-                  />
-                </td>
-                <td className="py-2 px-4 border">
-                  <input
-                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
-                    type="number"
-                    min="1"
-                    name="quantity"
-                    value={item.quantity === 0 ? '' : item.quantity}
-                    onChange={(e) => handleItemChange(index, e)}
-                    required
-                  />
-                </td>
-                <td className="py-2 px-4 border">
-                  <select
-                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
-                    name="unit"
-                    value={item.unit}
-                    onChange={(e) => handleItemChange(index, e)}
-                    required
-                  >
-                    {unitOptions.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2 px-4 border">
-                  <input
-                    className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
-                    type="number"
-                    min="0"
-                    name="unit_price"
-                    value={item.unit_price === 0 ? '' : item.unit_price}
-                    onChange={(e) => handleItemChange(index, e)}
-                    required
-                  />
-                </td>
-                <td className="py-2 px-4 border font-medium">
-                  {new Intl.NumberFormat('id-ID', {
-                    style: 'currency',
-                    currency: 'IDR',
-                    minimumFractionDigits: 0,
-                  }).format(item.amount)}
-                </td>
-                <td className="py-2 px-4 border">
-                  <button
-                    type="button"
-                    className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded"
-                    onClick={() => removeItem(index)}
-                  >
-                    Hapus
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          {/* footer subtotal/tax/total dihilangkan demi ringkas */}
-        </table>
-      </div>
-
-      <div className="flex items-center justify-center mt-6">
-        <button
-          className={`bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ${
-            loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-          type="submit"
-          disabled={loading}
-        >
-          {loading ? 'Menyimpan...' : 'Simpan Purchase Order'}
-        </button>
-      </div>
-    </form>
+    <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+      <h2 className="text-xl font-semibold mb-6">Form Surat Purchase Order</h2>
+      
+      <form ref={formRef} onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* PO Number */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="po_number">
+              Nomor PO <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="po_number"
+              name="po_number"
+              type="text"
+              value={formData.po_number}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          {/* Date */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="date">
+              Tanggal <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="date"
+              name="date"
+              type="date"
+              value={formData.date}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          {/* Supplier */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="supplier">
+              Supplier <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="supplier"
+              name="supplier"
+              type="text"
+              value={formData.supplier}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          {/* Address */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="address">
+              Alamat Supplier <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="address"
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              rows={2}
+              required
+            />
+          </div>
+          
+          {/* Attention */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="attention">
+              Attention
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="attention"
+              name="attention"
+              type="text"
+              value={formData.attention}
+              onChange={handleChange}
+            />
+          </div>
+          
+          {/* Shipping Address */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="shipping_address">
+              Alamat Pengiriman <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="shipping_address"
+              name="shipping_address"
+              value={formData.shipping_address}
+              onChange={handleChange}
+              rows={2}
+              required
+            />
+          </div>
+          
+          {/* Bank */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="bank">
+              Bank
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="bank"
+              name="bank"
+              type="text"
+              value={formData.bank}
+              onChange={handleChange}
+            />
+          </div>
+          
+          {/* Account */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="account">
+              Nomor Rekening
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="account"
+              name="account"
+              type="text"
+              value={formData.account}
+              onChange={handleChange}
+            />
+          </div>
+          
+          {/* Attention Pay Term */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="attention_pay_term">
+              Attention Pay Term
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="attention_pay_term"
+              name="attention_pay_term"
+              type="text"
+              value={formData.attention_pay_term}
+              onChange={handleChange}
+            />
+          </div>
+          
+          {/* Order By */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="order_by">
+              Dipesan Oleh <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="order_by"
+              name="order_by"
+              type="text"
+              value={formData.order_by}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          {/* Note */}
+          <div className="mb-4 md:col-span-2">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="note">
+              Catatan
+            </label>
+            <textarea
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              id="note"
+              name="note"
+              value={formData.note}
+              onChange={handleChange}
+              rows={2}
+            />
+          </div>
+        </div>
+        
+        {/* Items Table */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Detail Item</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deskripsi</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jumlah</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Satuan</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                  <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.items.map((item, index) => (
+                  <tr key={index} className="border-b">
+                    <td className="py-2 px-3">
+                      <input
+                        className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                        name="item_description"
+                        value={item.item_description}
+                        onChange={(e) => handleItemChange(index, e)}
+                        required
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                        name="item_code"
+                        value={item.item_code}
+                        onChange={(e) => handleItemChange(index, e)}
+                        required
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                        type="number"
+                        min="1"
+                        name="quantity"
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(index, e)}
+                        required
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <select
+                        className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                        name="unit"
+                        value={item.unit}
+                        onChange={(e) => handleItemChange(index, e)}
+                        required
+                      >
+                        {unitOptions.map((unit) => (
+                          <option key={unit} value={unit}>
+                            {unit}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700"
+                        type="number"
+                        min="0"
+                        name="unit_price"
+                        value={item.unit_price}
+                        onChange={(e) => handleItemChange(index, e)}
+                        required
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        className="shadow appearance-none border rounded w-full py-1 px-2 text-gray-700 bg-gray-100"
+                        type="number"
+                        name="amount"
+                        value={item.amount}
+                        readOnly
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <button
+                        type="button"
+                        className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline"
+                        onClick={() => removeItem(index)}
+                      >
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={5} className="py-2 px-3 text-right font-bold">
+                    Total:
+                  </td>
+                  <td className="py-2 px-3 font-bold">
+                    {calculateTotal().toLocaleString('id-ID', {
+                      style: 'currency',
+                      currency: 'IDR',
+                      minimumFractionDigits: 0,
+                    })}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          
+          <div className="mt-4">
+            <button
+              type="button"
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              onClick={addItem}
+            >
+              + Tambah Item
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-end">
+          <button
+            type="submit"
+            className={`bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ${
+              loading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            disabled={loading}
+          >
+            {loading ? 'Menyimpan...' : 'Simpan Purchase Order'}
+          </button>
+        </div>
+      </form>
+      
+      {/* Debug view - comment out in production */}
+      {/* <div className="mt-8 p-4 bg-gray-100 rounded">
+        <h3 className="text-sm font-bold mb-2">Debug View:</h3>
+        <pre className="text-xs overflow-auto">
+          {JSON.stringify(formData, null, 2)}
+        </pre>
+      </div> */}
+    </div>
   );
 }

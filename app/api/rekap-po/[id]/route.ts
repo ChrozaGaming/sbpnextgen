@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
@@ -9,7 +10,6 @@ export async function PUT(
         // Await the entire params object first, then access properties
         const paramsData = await context.params;
         const id = paramsData.id;
-        
         const data = await request.json();
 
         // Validate ID
