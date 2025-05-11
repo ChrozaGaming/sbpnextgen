@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: May 02, 2025 at 08:32 AM
+-- Generation Time: May 04, 2025 at 04:27 AM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
@@ -20,6 +20,77 @@ SET time_zone = "+00:00";
 --
 -- Database: `sbp`
 --
+
+DELIMITER $$
+--
+-- Procedures
+--
+CREATE DEFINER=`root`@`localhost` PROCEDURE `add_stock_in` (IN `p_kode` VARCHAR(50), IN `p_jumlah` INT, IN `p_tanggal_masuk` DATE)   BEGIN  
+    UPDATE stok SET 
+        stok_masuk = stok_masuk + p_jumlah, 
+        stok_sisa = stok_sisa + p_jumlah, 
+        tanggal_masuk = p_tanggal_masuk, 
+        updated_at = CURRENT_TIMESTAMP 
+    WHERE kode = p_kode;  
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `reduce_stock` (IN `p_kode` VARCHAR(50), IN `p_jumlah` INT, IN `p_tanggal_keluar` DATE)   BEGIN  
+    UPDATE stok SET 
+        stok_keluar = stok_keluar + p_jumlah, 
+        stok_sisa = stok_sisa - p_jumlah, 
+        tanggal_keluar = p_tanggal_keluar, 
+        updated_at = CURRENT_TIMESTAMP 
+    WHERE kode = p_kode AND stok_sisa >= p_jumlah;  
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `reset_all_autoincrement` ()   BEGIN  
+    DECLARE done INT DEFAULT 0;  
+    DECLARE table_name VARCHAR(255);  
+    DECLARE cur CURSOR FOR SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE();  
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;  
+    
+    OPEN cur;  
+    read_loop: LOOP  
+        FETCH cur INTO table_name;  
+        IF done THEN LEAVE read_loop; END IF;  
+        
+        SET @row_count_query = CONCAT('SELECT COUNT(*) INTO @row_count FROM ', table_name);  
+        PREPARE stmt_row_count FROM @row_count_query;  
+        EXECUTE stmt_row_count;  
+        DEALLOCATE PREPARE stmt_row_count;  
+        
+        IF @row_count = 0 THEN  
+            SET @reset_query = CONCAT('ALTER TABLE ', table_name, ' AUTO_INCREMENT = 1');  
+            PREPARE stmt_reset FROM @reset_query;  
+            EXECUTE stmt_reset;  
+            DEALLOCATE PREPARE stmt_reset;  
+        END IF;  
+    END LOOP;  
+    CLOSE cur;  
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `reset_autoincrement` (IN `table_name` VARCHAR(255))   BEGIN  
+    SET @query = CONCAT('ALTER TABLE ', table_name, ' AUTO_INCREMENT = 1');  
+    PREPARE stmt FROM @query;  
+    EXECUTE stmt;  
+    DEALLOCATE PREPARE stmt;  
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `reset_surat_jalan_autoincrement` ()   BEGIN  
+    SET @query = 'ALTER TABLE surat_jalan AUTO_INCREMENT = 1';  
+    PREPARE stmt FROM @query;  
+    EXECUTE stmt;  
+    DEALLOCATE PREPARE stmt;  
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `reset_table_autoincrement` (IN `table_name` VARCHAR(255))   BEGIN  
+    SET @query = CONCAT('ALTER TABLE ', table_name, ' AUTO_INCREMENT = 1');  
+    PREPARE stmt FROM @query;  
+    EXECUTE stmt;  
+    DEALLOCATE PREPARE stmt;  
+END$$
+
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -82,7 +153,8 @@ CREATE TABLE `purchase_orders` (
 INSERT INTO `purchase_orders` (`id`, `po_number`, `date`, `supplier`, `address`, `attention`, `note`, `shipping_address`, `bank`, `account`, `attention_pay_term`, `order_by`, `total_amount`, `subtotal`, `tax`, `grand_total`, `created_at`, `updated_at`) VALUES
 (1, '12313123', '2025-05-13', 'adada', 'dadad', 'adada', 'dadad', 'dada', '', '', '', 'admin', 2200000.00, 2200000.00, 242000.00, 2442000.00, '2025-04-30 07:48:45', '2025-04-30 07:48:45'),
 (2, 'adadadada', '2025-05-15', 'adadadad', 'adadadad', 'adadadadad', 'adadad', 'adadadad', 'adada', 'dadada', 'adadada', '3i2daa', 400000.00, 400000.00, 44000.00, 444000.00, '2025-04-30 08:34:29', '2025-04-30 08:34:29'),
-(3, 'ANJHERR', '2025-05-30', 'adada', 'dadada', 'ADAD', 'Transfer', 'ADADAD', 'BCA', '2341234234', 'Berhasil', 'Admin', 40000020.00, 40000020.00, 4400002.20, 44400022.20, '2025-04-30 08:51:04', '2025-04-30 08:51:04');
+(3, 'ANJHERR', '2025-05-30', 'adada', 'dadada', 'ADAD', 'Transfer', 'ADADAD', 'BCA', '2341234234', 'Berhasil', 'Admin', 40000020.00, 40000020.00, 4400002.20, 44400022.20, '2025-04-30 08:51:04', '2025-04-30 08:51:04'),
+(4, 'FXS-123123', '2025-05-04', 'PT. JNE ', 'JL MOJOLANGU, KAB PASURUAN', 'Tes', 'Bagus', 'JL RAJAWALI III KAB JOMBANG', 'Bank BCA', '0812312312', 'Pak George', 'Sunaryadi', 2440000.00, 2440000.00, 268400.00, 2708400.00, '2025-05-04 02:08:06', '2025-05-04 02:08:06');
 
 -- --------------------------------------------------------
 
@@ -109,7 +181,9 @@ INSERT INTO `purchase_order_items` (`id`, `purchase_order_id`, `item_description
 (1, 1, 'adad', 'adad', 3, 'kg', 400000.00, 1200000.00),
 (2, 1, 'adada', 'dadad', 5, 'kgset', 200000.00, 1000000.00),
 (3, 2, 'adada', 'adadadada', 1, 'galon5liter', 400000.00, 400000.00),
-(4, 3, 'adada', 'dadadada', 1, 'pcs', 40000020.00, 40000020.00);
+(4, 3, 'adada', 'dadadada', 1, 'pcs', 40000020.00, 40000020.00),
+(5, 4, 'CAT DUCOTEX', 'HF-1312', 4, 'pcs', 600000.00, 2400000.00),
+(6, 4, 'CAT ALCOTEX', 'VFA-1312', 1, 'pcs', 40000.00, 40000.00);
 
 -- --------------------------------------------------------
 
@@ -137,7 +211,7 @@ CREATE TABLE `rekap_po` (
 --
 
 INSERT INTO `rekap_po` (`id`, `no_po`, `judulPO`, `tanggal`, `status`, `progress`, `nilai_penawaran`, `nilai_po`, `biaya_pelaksanaan`, `profit`, `keterangan`, `nama_perusahaan`) VALUES
-(1, 'PO-2024-001', 'Pengadaan Bahan Baku A', '2024-05-01', 25.00, 'onprogress', 150000000.00, 145000000.00, 100000000.00, 45000000.00, 'Termin 1 dibayar', 'PT Sinar Buana Prima'),
+(1, 'PO-2024-001', 'Pengadaan Bahan Baku A', '2024-05-01', 25.00, 'finish', 150000000.00, 145000000.00, 100000000.00, 45000000.00, 'Termin 1 dibayar', 'PT Sinar Buana Prima'),
 (2, 'PO-2024-002', 'Jasa Konstruksi Proyek B', '2024-05-10', 100.00, 'finish', 300000000.00, 290000000.00, 230000000.00, 60000000.00, 'Selesai tanpa kendala', 'PT Bangun Beton Sejahtera'),
 (3, 'PO-2024-003', 'Pengadaan Alat Produksi C', '2024-06-03', 60.00, 'onprogress', 50000000.00, 48000000.00, 35000000.00, 13000000.00, 'Menunggu pengiriman tahap 2', 'PT Teknomas Nusantara'),
 (4, 'PO-2024-004', 'Renovasi Gedung D', '2024-04-25', 80.00, 'onprogress', 100000000.00, 98000000.00, 75000000.00, 23000000.00, 'Pekerjaan finishing', 'PT Arsitek Muda Prima'),
@@ -183,6 +257,13 @@ CREATE TABLE `stok` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+--
+-- Dumping data for table `stok`
+--
+
+INSERT INTO `stok` (`id`, `kode`, `nama`, `kategori`, `sub_kategori_id`, `stok_masuk`, `stok_keluar`, `stok_sisa`, `satuan`, `lokasi`, `tanggal_entry`, `tanggal_masuk`, `tanggal_keluar`, `keterangan`, `created_at`, `updated_at`) VALUES
+(39, 'MAT-001', 'Material 1', 'material', 151, 5, 2, 3, 'kg', 'Gudang', '2025-05-02', '2025-05-02', '2025-05-02', 'pembelian', '2025-05-02 14:57:11', '2025-05-02 14:59:40');
 
 -- --------------------------------------------------------
 
@@ -254,7 +335,8 @@ CREATE TABLE `surat_jalan` (
 INSERT INTO `surat_jalan` (`id`, `tujuan`, `nomor_surat`, `tanggal`, `nomor_kendaraan`, `no_po`, `keterangan_proyek`, `created_at`, `updated_at`) VALUES
 (13, 'Singosari', 'NFAFA131', '2025-05-08', 'W233PQX', '912313', 'Pekerjaan', '2025-04-30 03:17:32', '2025-04-30 03:17:32'),
 (14, 'Batam', '82342', '2025-04-30', 'W3222PQX', '98234124', 'Pekerjaan', '2025-04-30 03:18:23', '2025-04-30 03:18:23'),
-(15, 'Pekanbaru', '82341F2', '2025-06-13', 'W888AK', 'IAD31231', 'Pekerjaan Proyek', '2025-04-30 03:29:32', '2025-04-30 03:29:32');
+(15, 'Pekanbaru', '82341F2', '2025-06-13', 'W888AK', 'IAD31231', 'Pekerjaan Proyek', '2025-04-30 03:29:32', '2025-04-30 03:29:32'),
+(16, 'PT Meiji', '123123', '2025-05-14', 'W1224QX', '4646464', 'Pengerjaan Epoxy ', '2025-05-02 14:59:40', '2025-05-02 14:59:40');
 
 -- --------------------------------------------------------
 
@@ -280,7 +362,8 @@ CREATE TABLE `surat_jalan_detail` (
 INSERT INTO `surat_jalan_detail` (`id`, `surat_jalan_id`, `no_urut`, `quantity`, `unit`, `weight`, `kode_barang`, `nama_barang`) VALUES
 (8, 13, 1, 1.00, 'kg', NULL, 'MAT-001', 'Material 1'),
 (9, 14, 1, 1.00, 'kg', NULL, 'MAT-001', 'Material 1'),
-(10, 15, 1, 3.00, 'kg', NULL, 'MAT-001', 'Material 1');
+(10, 15, 1, 3.00, 'kg', NULL, 'MAT-001', 'Material 1'),
+(11, 16, 1, 2.00, 'kg', NULL, 'MAT-001', 'Material 1');
 
 -- --------------------------------------------------------
 
@@ -339,7 +422,8 @@ CREATE TABLE `v_stok_report` (
 -- Structure for view `v_stok_report`
 --
 DROP TABLE IF EXISTS `v_stok_report`;
--- Error reading structure for table sbp.v_stok_report: #1142 - SHOW VIEW command denied to user &#039;pras&#039;@&#039;localhost&#039; for table `sbp`.`v_stok_report`
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_stok_report`  AS SELECT `s`.`kode` AS `kode`, `s`.`nama` AS `nama`, `s`.`kategori` AS `kategori`, `km`.`nama` AS `kategori_nama`, `skm`.`nama` AS `sub_kategori_nama`, `skm`.`brand` AS `brand`, `skm`.`status` AS `status`, `s`.`stok_masuk` AS `stok_masuk`, `s`.`stok_keluar` AS `stok_keluar`, `s`.`stok_sisa` AS `stok_sisa`, `s`.`satuan` AS `satuan`, `s`.`lokasi` AS `lokasi`, `s`.`tanggal_entry` AS `tanggal_entry`, `s`.`tanggal_masuk` AS `tanggal_masuk`, `s`.`tanggal_keluar` AS `tanggal_keluar`, `s`.`keterangan` AS `keterangan` FROM ((`stok` `s` join `sub_kategori_material` `skm` on(`s`.`sub_kategori_id` = `skm`.`id`)) join `kategori_material` `km` on(`skm`.`kategori_id` = `km`.`id`)) ;
 
 --
 -- Indexes for dumped tables
@@ -453,13 +537,13 @@ ALTER TABLE `kategori_material`
 -- AUTO_INCREMENT for table `purchase_orders`
 --
 ALTER TABLE `purchase_orders`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `purchase_order_items`
 --
 ALTER TABLE `purchase_order_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `rekap_po`
@@ -477,7 +561,7 @@ ALTER TABLE `sessions`
 -- AUTO_INCREMENT for table `stok`
 --
 ALTER TABLE `stok`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
 
 --
 -- AUTO_INCREMENT for table `stok_gudang`
@@ -495,13 +579,13 @@ ALTER TABLE `sub_kategori_material`
 -- AUTO_INCREMENT for table `surat_jalan`
 --
 ALTER TABLE `surat_jalan`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `surat_jalan_detail`
 --
 ALTER TABLE `surat_jalan_detail`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `users`

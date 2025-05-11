@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react/no-unescaped-entities */
 import React from 'react';
 
 const InstruksiPanduan: React.FC = () => {
@@ -44,8 +46,8 @@ const InstruksiPanduan: React.FC = () => {
                             <div className="text-gray-700">
                                 <div className="font-semibold mb-2">Pencarian berdasarkan kategori:</div>
                                 <ul className="ml-4 space-y-2 text-sm bg-gray-50 p-3 rounded-md">
-                                    {['Nomor PO', 'Perusahaan', 'Judul PO', 'Tanggal', 'Status'].map((item, index) => (
-                                        <li key={index} className="flex items-center space-x-2">
+                                    {['Nomor PO', 'Perusahaan', 'Judul PO', 'Tanggal', 'Status'].map((item) => (
+                                        <li key={item} className="flex items-center space-x-2">
                                             <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                                             </svg>
@@ -81,8 +83,8 @@ const InstruksiPanduan: React.FC = () => {
                                         'No PO', 'Perusahaan', 'Judul PO', 'Tanggal',
                                         'Nilai Penawaran', 'Nilai PO', 'Biaya Pelaksanaan',
                                         'Profit', 'Status Profit'
-                                    ].map((item, index) => (
-                                        <div key={index} className="flex items-center space-x-2">
+                                    ].map((item) => (
+                                        <div key={item} className="flex items-center space-x-2">
                                             <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                                             </svg>
@@ -153,7 +155,7 @@ const InstruksiPanduan: React.FC = () => {
                         'Selalu cek preview perubahan sebelum menyimpan perubahan biaya',
                         'Gunakan fitur cetak untuk dokumentasi dan pelaporan'
                     ].map((tip, index) => (
-                        <li key={index} className="flex items-center space-x-3 bg-white/50 p-3 rounded-lg">
+                        <li key={tip} className="flex items-center space-x-3 bg-white/50 p-3 rounded-lg">
                             <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
